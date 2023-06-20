@@ -1,0 +1,7 @@
+# path search paramaters
+costtype time
+N        9
+amax     2
+NPC     10
+startrow   7
+startcol   7
