@@ -59,14 +59,14 @@ def configure(fp=None):
 
 
 
-class grid2D:
+class grid1D:
     def __init__(self, N):
         self.N = N
         self.gr = []
         for i in range(self.N):
             row = []
             for j in range(self.N):
-                row.append(point2D(i,j))
+                row.append(point1D(i,j))
             self.gr.append(row)
 
     def __repr__(self):
@@ -78,13 +78,17 @@ class grid2D:
             txt += '\n'
         return txt
 
-class point2D:
+class point1D:
+    def __init__(self):
+        self.row = 0
+        self.col = 0
+        self.__init(self,self.row,self.col)
+
     def __init__(self,i,j):
         self.row = i
         self.col = j
         self.x =     2*j/(N-1) - 1
         self.v = -1*(2*i/(N-1) - 1)
-        self.tr = None
 
     def __eq__(self,x):
         return self.row == x.row and self.col == x.col
@@ -94,9 +98,191 @@ class point2D:
         #return ' ({:}, {:})'.format(self.row, self.col)
 
 
-class trajectory2D:
+class point3D:
+
+    def __init__(self,ix,iy,iz,ixd,iyd,izd):
+        self.ix = ix
+        self.iy = iy
+        self.iz = iz
+        self.ixd = ixd
+        self.iyd = iyd
+        self.izd = izd
+        self.x =     2*ix/(N-1) - 1
+        self.y =     2*iy/(N-1) - 1
+        self.z =     2*iz/(N-1) - 1
+        self.xd = -1*(2*ixd/(N-1) - 1)
+        self.yd = -1*(2*iyd/(N-1) - 1)
+        self.zd = -1*(2*izd/(N-1) - 1)
+        self.ivect = [self.ix, self.iy, self.iz, self.ixd, self.iyd, self.izd]
+        self.xvect = [self.x,self.y,self.z,self.xd,self.yd,self.zd]
+
+    def __eq__(self,x):
+        for i,s in self.ivect:
+            if s != x.ivect[i]:
+                return False
+        return True
+
+    def __repr__(self):
+        st = ' ('
+        for s in self.ivect:
+            st += '{:3d}, '.format(s)
+        st += ')'
+        return st
+
+
+
+class trajectory3D:
     def __init__(self,p1,p2):
-        print('trajectory2D: p1,p2: ',p1,p2)
+        if str(type(p1)) != "<class 'c2to.point3D'>" or str(type(p2)) != "<class 'c2to.point3D'>":
+            error('trajectory3D called with 1D point!')
+        print('trajectory1D: p1,p2: ',p1,p2)
+        self.p1 = p1
+        self.p2 = p2
+        self.a0 = [0,0,0]
+        self.a1 = [0,0,0]
+        self.a2 = [0,0,0]
+        self.a3 = [0,0,0]
+        self.computed = False
+        self.constrained = False
+        self.valid = True
+
+    def compute(self,dt):
+        p1 = self.p1
+        p2 = self.p2
+        for i in range(3):
+            self.a0[i] = p1.xvect[i]
+            self.a1[i] = p1.xvect[i+3]
+        #define some constants
+        b0 = dt
+        b1 = dt*dt
+        b2 = dt*dt*dt
+        b3 = 2.0*dt
+        b4 = 3.0*dt*dt
+        for i in range(3):
+            dx = p2.xvect[i]-p1.xvect[i]
+            dv = p2.xvect[i+3]-p1.xvect[i+3]
+            # a3 solution:
+            self.a3[i] = (dv - (b3/b1)*(dx-p1.xvect[i+3]*b0))/(b4-b2*b3/b1)
+            self.a2[i] = (dx - p1.xvect[i+3]*b0 - self.a3[i]*b2)/b1
+        self.computed = True
+
+    def x(self,t):
+        rv = [0,0,0]
+        for i in range(3):
+            rv[i] = self.a0[i] + self.a1[i]*t +    self.a2[i]*t*t +     self.a3[i]*t*t*t
+        return rv
+    def xd(self,t):
+        rv = [0,0,0]
+        for i in range(3):
+            rv[i] =     self.a1[i]   + 2.0*self.a2[i]*t  + 3.0*self.a3[i]*t*t
+        return rv
+    def xdd(self,t):
+        rv = [0,0,0]
+        for i in range(3):
+            rv[i] =       2.0*self.a2[i]    + 6.0*self.a3[i]*t
+        return rv
+
+
+    def get_Amax(self,dt):
+        if not self.computed:
+            error('cant get_Amax() unless tr.computed is True')
+        amax = -1000
+        acc1 = self.xdd(0)
+        acc2 = self.xdd(dt)
+        for i in range(3):
+            t = abs(acc1[i])
+            if t > amax:
+                amax = t
+            t = abs(acc2[i])
+            if t > amax:
+                amax = t
+        return amax
+
+
+    #
+    # it seems constrain_A can be identical for 3D and 1D(!)
+    #
+    def constrain_A(self):
+        # hack for fixed dt
+        #dt = DT_TEST
+        #self.compute(dt)
+
+        #
+        # adaptive dt
+        #
+        dt = 0.2
+        ni = 0
+        while True:
+            ni += 1
+            self.compute(dt)
+            if self.get_Amax(dt) > AMAX:
+                dt *= 1.1
+            else:
+                break
+        dt *= 0.9
+        while True:
+            ni += 1
+            self.compute(dt)
+            if self.get_Amax(dt) > AMAX:
+                dt *= 1.02
+            else:
+                break
+        print('Constrain_A: iterations: ', ni, ' dt = ', dt)
+        print('             self.get_Amax(dt):',self.get_Amax(dt))
+        self.dt = dt
+        self.constrained = True
+        self.compute(self.dt)
+        return dt
+
+    # also essentially unchanged!
+    def timeEvolution(self):
+        if not self.computed and not self.constrained:
+            error('Cant compute timeEvolution until trajectory is computed and constrained')
+        Np = 20-1
+        x = []
+        v = []
+        a = []
+        t = []
+        for t1 in range (Np):
+            t2 = self.dt*t1/Np
+            t.append(t2)
+            x.append(self.x(t2))
+            v.append(self.xd(t2))
+            a.append(self.xdd(t2))
+        t.append(self.dt)
+        x.append(self.x(self.dt))
+        v.append(self.xd(self.dt))
+        a.append(self.xdd(self.dt))
+        ##print('A shape1: ',a.shape())
+        t = np.array(t).T
+        x = np.array(x).T
+        v = np.array(v).T
+        a = np.array(a).T
+        print('X shape: (tev)',x.shape)
+
+        return t,x,v,a
+
+    #
+    #   Energy cost: sum of squared acceleration
+    def cost_e(self,a):
+        if not self.computed and not self.constrained:
+            error('Cant compute cost_e until trajectory is computed and constrained')
+        c = 0.0
+        n = len(a)
+        for i in range(3):
+            for a1 in a:
+                c += self.dt*a1[i]*a1[i]/n
+        return c
+
+    def cost_t(self):
+        if not self.computed and not self.constrained:
+            error('Cant compute cost_t until trajectory is computed and constrained')
+        return self.dt
+
+
+class trajectory1D:
+    def __init__(self,p1,p2):
+        print('trajectory1D: p1,p2: ',p1,p2)
         self.p1 = p1
         self.p2 = p2
         self.computed = False
@@ -132,6 +318,8 @@ class trajectory2D:
         return                       2.0*self.a2    + 6.0*self.a3*t
 
     def get_Amax(self,dt):
+        if not self.computed:
+            error('cant get_Amax() unless tr.computed is True')
         return max(abs(self.xdd(0)),abs(self.xdd(dt)))
 
     def constrain_A(self):
@@ -221,7 +409,7 @@ class Cm:
                         #print('i1, j1, i2, j2:',i1,j1,i2,j2)
                         p1 = grid.gr[i1][j1]
                         p2 = grid.gr[i2][j2]
-                        t = trajectory2D(p1,p2)
+                        t = trajectory1D(p1,p2)
                         #print('computing cost: ',t)
                         if (p1.x == p2.x and p1.v == p2.v):
                             t.valid = False  # eliminate self transitions
@@ -399,17 +587,17 @@ def tests():
     print('Cm tests: ')
     print(c1)
 
-    print('grid2D tests:')
-    gt = grid2D(N)
+    print('grid1D tests:')
+    gt = grid1D(N)
     print(gt)
 
     print('cost tests')
 
-    p1 = point2D(0,0)
-    p2 = point2D(N,N)
-    print ('{:5.1f}'.format(trajectory2D(p1,p2).cost_e()))
-    p3 = point2D(1,1)
-    print ('{:5.1f}'.format(trajectory2D(p1,p3).cost_e()))
+    p1 = point1D(0,0)
+    p2 = point1D(N,N)
+    print ('{:5.1f}'.format(trajectory1D(p1,p2).cost_e()))
+    p3 = point1D(1,1)
+    print ('{:5.1f}'.format(trajectory1D(p1,p3).cost_e()))
 
     print('fill tests')
     c1.fill(gt)

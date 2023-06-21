@@ -12,7 +12,7 @@ def main(args):
     idx = int(args[1])
 
     # create grid
-    gt = cto.grid2D(cto.N)
+    gt = cto.grid1D(cto.N)
 
     # cost matrix
     c1 = cto.Cm()
