@@ -235,7 +235,8 @@ class trajectory3D:
         return dt
 
     # also essentially unchanged!
-    def timeEvolution(self):
+    # 3D
+    def timeEvolution(self,ACC_ONLY = False):
         if not self.computed and not self.constrained:
             error('Cant compute timeEvolution until trajectory is computed and constrained')
         Np = 20-1
@@ -246,21 +247,28 @@ class trajectory3D:
         for t1 in range (Np):
             t2 = self.dt*t1/Np
             t.append(t2)
-            x.append(self.x(t2))
-            v.append(self.xd(t2))
+            if not ACC_ONLY:
+                x.append(self.x(t2))
+                v.append(self.xd(t2))
             a.append(self.xdd(t2))
         t.append(self.dt)
-        x.append(self.x(self.dt))
-        v.append(self.xd(self.dt))
+        if not ACC_ONLY:
+            x.append(self.x(self.dt))
+            v.append(self.xd(self.dt))
         a.append(self.xdd(self.dt))
         ##print('A shape1: ',a.shape())
+        #
+        #  make nicer for plotting and output
         t = np.array(t).T
-        x = np.array(x).T
-        v = np.array(v).T
+        if not ACC_ONLY:
+            x = np.array(x).T
+            v = np.array(v).T
         a = np.array(a).T
-        print('X shape: (tev)',x.shape)
-
-        return t,x,v,a
+        #print('X shape: (tev)',x.shape)
+        if ACC_ONLY:
+            return a
+        else:
+            return t,x,v,a
 
     #
     #   Energy cost: sum of squared acceleration
@@ -354,7 +362,7 @@ class trajectory1D:
         self.compute(self.dt)
         return dt
 
-    def timeEvolution(self):
+    def timeEvolution(self,ACC_ONLY = False):
         if not self.computed and not self.constrained:
             error('Cant compute timeEvolution until trajectory is computed and constrained')
         Np = 20
@@ -365,14 +373,19 @@ class trajectory1D:
         for t1 in range (Np):
             t2 = self.dt*t1/Np
             t.append(t2)
-            x.append(self.x(t2))
-            v.append(self.xd(t2))
+            if not ACC_ONLY:
+                x.append(self.x(t2))
+                v.append(self.xd(t2))
             a.append(self.xdd(t2))
-        t.append(self.dt)
-        x.append(self.x(self.dt))
-        v.append(self.xd(self.dt))
+        if not ACC_ONLY:
+            t.append(self.dt)
+            x.append(self.x(self.dt))
+            v.append(self.xd(self.dt))
         a.append(self.xdd(self.dt))
-        return t,x,v,a
+        if ACC_ONLY:
+            return a
+        else:
+            return t,x,v,a
 
     #
     #   Energy cost: sum of squared acceleration
@@ -427,6 +440,80 @@ class Cm:
             res += '\n'
         return res
 
+# find the path without filling up the cost matrix Cm
+class path3D:
+    def __init__(self,grid,Cm):
+        # sanity check!!
+        if N**6 > 1.0E4:
+            error('too big a search!!: '+float(N**6))
+        def getidx(v):
+            return v[0]*N**5+v[1]*N**4+v[2]*N**3+v[3]*N*N+v[4]*N+v[5]
+
+        # build the point list:
+        #   point list will be searched for lowest cost
+        pts = [None for x in range(N*N*N*N*N*N)] #  N^6!!!
+        for ix in range(N):
+            for iy in range(N):
+                for iz in range(N):
+                    for idx in range(N):
+                        for idy in range(N):
+                            for idz in range(N):
+                                index = getidx([ix,iy,iz,idx,idy,idz])
+                                pts[index] = point3D(ix,iy,iz,idx,idy,idz)
+
+        pstart = point3D(1,2,3,7,6,5)  # starting point
+        mark = [True for x in range(N**6)]
+        count = 0
+        mark[sr*N+sc] = False # mark our starting point
+        self.Tcost = 0.0
+        self.path = []
+        while len(self.path) < N**6-1:
+            # start adding next point to path list
+            cmin = 99999999
+            cminidx = 0
+            found = False
+            # search costs through the available next points:
+            for ix in range(N):
+                for iy in range(N):
+                    for iz in range(N):
+                        for idx in range(N):
+                            for idy in range(N):
+                                for idz in range(N):
+                                    index = getidx([ix,iy,iz,idx,idy,idz])
+                                    if mark[index]:
+                                        p1 = pstart
+                                        p2 = point3D(ix,iy,iz,idx,idy,idz)
+                                        tr = trajectory3D(p1,p2)
+                                        if costtype == 'energy':
+                                            tc = tr.cost_e(a)
+                                        elif costtype == 'time':
+                                            tc = tr.cost_t()
+                                        else:
+                                            error('unknown cost type (3D): '+costtype)
+                                        if tc < cmin:
+                                            cmin = tc
+                                            p2cmin = p2
+                                            minidx = index
+                                            found == True
+            # we've found lowest cost cmin and that point
+            #
+            # make sure though:
+            if not found:
+                error('I didnt find a minimum cost!!'+ str(count))
+            if not mark[cminidx]:
+                error('new path point is marked already!')
+            mark[index] = False  # do not visit this point again
+            if not p2.valid:
+                error('path: invalid new point',p2)
+            # future: go back and find all points with same cost as p2cmin
+            self.path.append(p2)
+            pstart = p2
+            self.Tcost += cmin
+        print('Path search completed!')
+        print('Total path cost ({:}) = {:8.2f}: '.format(costtype,self.Tcost))
+
+
+
 
 class path:
     def __init__(self,grid,Cm):
@@ -448,7 +535,7 @@ class path:
                 if mark[ccol]:
                     if Cm.m[crow][ccol].valid:  # first attempt: pick first min cost traj.
                                                            # and elim self transitions
-                        x,v,a,t = Cm.m[crow][ccol].timeEvolution()
+                        a = Cm.m[crow][ccol].timeEvolution(ACC_ONLY)
                         if costtype == 'energy':
                             ccost = Cm.m[crow][ccol].cost_e(a)
                         elif costtype == 'time':
