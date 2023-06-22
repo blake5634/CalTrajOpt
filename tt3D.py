@@ -7,8 +7,10 @@ cto.configure()  # read in config parameters
 
     #def __init__(self,ix,iy,iz,ixd,iyd,izd):
 
-p1 = cto.point3D(8,7,6,4,3,2)
-p2 = cto.point3D(2,3,4,4,5,6)
+#p1 = cto.point3D(8,7,6,4,3,2)
+#p2 = cto.point3D(2,3,4,4,5,6)
+p1 = cto.point3D(1,0,2,2,0,1)
+p2 = cto.point3D(0,2,1,0,2,0)
 
 tr = cto.trajectory3D(p1,p2)
 

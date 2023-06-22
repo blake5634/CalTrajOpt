@@ -12,21 +12,22 @@ def main(args):
     idx = int(args[1])
 
     # create grid
-    gt = cto.grid1D(cto.N)
+    #gt = cto.grid1D(cto.N)
 
     # cost matrix
-    c1 = cto.Cm()
-    c1.fill(gt)
+    #c1 = cto.Cm()
+    #c1.fill(gt)
 
 
     # compute a path:
-    p = cto.path(gt,c1)
+    #p = cto.path3d(gt,c1)
+    p = cto.path3D()
     # is it a valid path?
-    p.check()
+    #p.check()
 
     # graph the path
-    p.plot(idx)
-
+    #p.plot(idx)
+    p.save('3Dsearch')
 
 
 
