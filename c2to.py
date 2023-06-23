@@ -29,7 +29,7 @@ startrow = 3
 startcol = 1
 
 def configure(fp=None):
-    print('Pyton path: ', sys.path)
+    #print('Pyton path: ', sys.path)
     global costtype, AMAX, DT_TEST, N,M, NPC, startrow, startcol
     if not fp:
         f = open('ctoConfig.txt','r')
@@ -577,6 +577,9 @@ class path3D:
         col_types = [ int_type, float_type, float_type, float_type]
         col_comments = ['','','','']
         df.set_metadata(col_names, col_types, col_comments)
+        df.metadata.d['AMAX']=AMAX
+        df.metadata.d['N'] = N
+        df.metadata.d['costtype'] = costtype
         if df.validate():
             print('Datafile is properly set up with valid metadata')
         else:
