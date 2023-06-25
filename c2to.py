@@ -249,9 +249,9 @@ class trajectory3D:
 
     # also essentially unchanged!
     # 3D
-    def timeEvolution(self,ACC_ONLY = False):
+    def timeEvolution(self,ACC_ONLY = False):  #3D
         if not self.computed and not self.constrained:
-            error('Cant compute timeEvolution until trajectory is computed and constrained')
+            error('Cant compute 3D timeEvolution until trajectory is computed and constrained')
         Np = 20-1
         x = []
         v = []
@@ -285,7 +285,7 @@ class trajectory3D:
 
     #
     #   Energy cost: sum of squared acceleration
-    def cost_e(self,a):
+    def cost_e(self,a):  #3D
         if not self.computed and not self.constrained:
             error('Cant compute cost_e until trajectory is computed and constrained')
         c = 0.0
@@ -491,6 +491,7 @@ class path3D:
                                             tr = trajectory3D(p1,p2)
                                             tr.constrain_A()
                                             if costtype == 'energy':
+                                                a =  tr.timeEvolution(ACC_ONLY=True)
                                                 tc = tr.cost_e(a)
                                             elif costtype == 'time':
                                                 tc = tr.cost_t()
@@ -617,7 +618,7 @@ class path:
                 if mark[ccol]:
                     if Cm.m[crow][ccol].valid:  # first attempt: pick first min cost traj.
                                                            # and elim self transitions
-                        a = Cm.m[crow][ccol].timeEvolution(ACC_ONLY)
+                        a = Cm.m[crow][ccol].timeEvolution(ACC_ONLY=True)
                         if costtype == 'energy':
                             ccost = Cm.m[crow][ccol].cost_e(a)
                         elif costtype == 'time':
