@@ -31,6 +31,7 @@ for row in df.reader:
 print('')
 print('Read in {:} points with brl_data'.format(len(x)))
 print('Cost: {:}, Amax: {:}'.format(df.metadata.d['costtype'],df.metadata.d['AMAX']))
+print('Advanced Search: {:}'.format(df.metadata.d['Advanced_searchtype']))
 print('')
 # References
 # https://gist.github.com/neale/e32b1f16a43bfdc0608f45a504df5a84
@@ -62,7 +63,9 @@ ax = fig.add_subplot(111, projection='3d')
 ax.set_xlabel('X(t)')
 ax.set_ylabel('Y(t)')
 ax.set_zlabel('Z(t)')
-ax.set_title('3D phase space "optimal" trajectory\nCost: {:}, Amax: {:}'.format(df.metadata.d['costtype'],df.metadata.d['AMAX']))
+tstring = '3D phase space "optimal" trajectory\nCost: {:}, Amax: {:}'.format(df.metadata.d['costtype'],df.metadata.d['AMAX'])
+tstring += '\n Advanced Search: {:}'.format(df.metadata.d['Advanced_searchtype'])
+ax.set_title(tstring)
 
 # NOTE: Can't pass empty arrays into 3d version of plot()
 line = plt.plot(dataSet[0], dataSet[1], dataSet[2], lw=2, c='g')[0] # For line plot

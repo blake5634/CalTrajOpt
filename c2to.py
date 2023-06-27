@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import brl_data.brl_data as bd
 import sys
+import random
 
 def error(msg):
     print('Error: ')
@@ -25,6 +26,7 @@ NPC = 20  # number plot points per curve
 costtype = 'time'
 costtype = 'energy'
 
+# for 1D optimization case
 startrow = 3
 startcol = 1
 
@@ -39,7 +41,7 @@ def configure(fp=None):
     for line in f:
         parname, *rest = line.split(' ')
         parname = parname.strip()
-        v = ' '.join(rest).strip()
+        v = ' '.join(rest).strip() # parameter value as string
 
         if parname == '#':
             next
@@ -51,10 +53,10 @@ def configure(fp=None):
         if parname == 'amax':
             AMAX = float(v)
         if parname == 'dt_test':
-            DT_TEST = dt_test
+            DT_TEST = dt_test  # fixed dt value used for testing
         if parname == 'N':
             N = int(v)
-            M = N*N
+            M = N*N  # used in 1D code
         if parname == 'NPC':
             NPC = int(v)
         if parname == 'startrow':
@@ -285,7 +287,7 @@ class trajectory3D:
 
     #
     #   Energy cost: sum of squared acceleration
-    def cost_e(self,a):  #3D
+    def cost_e(self, a):  #3D
         if not self.computed and not self.constrained:
             error('Cant compute cost_e until trajectory is computed and constrained')
         c = 0.0
@@ -295,7 +297,7 @@ class trajectory3D:
                 c += self.dt*a1[i]*a1[i]/n
         return c
 
-    def cost_t(self):
+    def cost_t(self, a):  # need a parameter for efficient calling though not used(!)
         if not self.computed and not self.constrained:
             error('Cant compute cost_t until trajectory is computed and constrained')
         return self.dt
@@ -453,9 +455,98 @@ class Cm:
             res += '\n'
         return res
 
+class search_from_curr_pt:
+    def __init__(self,Mark):
+        self.costtype = 'None yet'
+        self.pstart = None  # last known trajectory point (or initial point)
+        self.cmin   = 99999999999
+        self.minidx = 0
+        self.minTrs = []
+        self.minidxs = []
+        self.found = False
+        self.mark = Mark  # array to mark already chosen pts (True == still available)
+
+
+    def iterate(self,N,function):
+        def getidx(v):
+            return v[0]*N**5+v[1]*N**4+v[2]*N*N*N+v[3]*N*N+v[4]*N+v[5]
+        for ix in range(N):
+                for iy in range(N):
+                    for iz in range(N):
+                        for idx in range(N):
+                            for idy in range(N):
+                                for idz in range(N):
+                                    ivect = [ix,iy,iz,idx,idy,idz]
+                                    index = getidx(ivect)
+                                    function(index,ivect)
+
+    def find_cmin(self,index,ivect):  # should be called by iterate as first step.
+        if self.mark[index]:
+            p1 = self.pstart
+            p2 = point3D(ivect)
+            if p1==p2:
+                p2.valid = False
+            if p2.valid:
+                tr = trajectory3D(p1,p2)
+                tc = self.eval_cost(tr)
+                if tc < self.cmin:
+                    self.cmin   = tc
+                    self.p2Cmin = tr.p2
+                    self.trCmin = tr
+                    self.minidx = index
+                    self.found = True
+
+    def eval_cost(self,tr):
+        tr.constrain_A()
+        if self.costtype == 'energy':
+            a =  tr.timeEvolution(ACC_ONLY=True)
+            tc = tr.cost_e(a)
+        elif self.costtype == 'time':
+            tc = tr.cost_t()
+        else:
+            error('search:set_costtype: unknown cost type (3D): '+costtype)
+        return tc
+
+    def select_next(self):
+        L = len(self.minTrs)
+        if L < 1:
+            error('search.select_next: no next trajs identified yet. did you run find_all_cminTrs?')
+        if L == 1:
+            self.mark[self.minidx] = False
+            return self.minidx, self.minTrs[0]
+        # pick one at random
+        print('select_next: choosing a random min traj! from ',len(self.minidxs))
+        tr = random.choice(self.minTrs)   #
+        if not tr.computed or not tr.constrained:
+            error('select_next: trajectory is not comp or const.')
+        ti = random.choice(self.minidxs)
+        self.mark[ti] = False
+        return ti,tr
+
+    def find_all_cminTrs(self,index,ivect): # find a list of all next pts for which cost ~= cmin
+        if not self.found:
+            error('search.find_all_cminTrs: somethings wrong, need to find_cmin before find_all')
+        epsilon = self.cmin * 0.05 # define 'close'
+        if self.mark[index]:
+            p1 = self.pstart
+            p2 = point3D(ivect)
+            if p1==p2:
+                p2.valid = False
+            if p2.valid:
+                tr = trajectory3D(p1,p2)
+                tc = self.eval_cost(tr)
+                if abs(tc-self.cmin) < epsilon:
+                    self.minTrs.append(tr)
+                    self.minidxs.append(index)
+
+
 # find the path without filling up the cost matrix Cm
 class path3D:
-    def __init__(self):
+    def __init__(self, adv=True):
+        ADVANCED = adv
+        BASIC = not ADVANCED
+        self.advflag = adv
+
         # sanity check!!
         if N**6 > 1.0E4:
             error('too big a search!!: '+float(N**6))
@@ -467,71 +558,101 @@ class path3D:
         mark = [True for x in range(N**6)]
         count = 0
         mark[getidx(v1)] = False # mark our starting point
-        self.Tcost = 0.0
-        self.path = []
-        plen = 0
-        while len(self.path) < N**6-1:
-            # start adding next point to path list
-            cmin = 99999999
-            found = False
-            # search costs through the available next points:
-            for ix in range(N):
-                for iy in range(N):
-                    for iz in range(N):
-                        for idx in range(N):
-                            for idy in range(N):
-                                for idz in range(N):
-                                    index = getidx([ix,iy,iz,idx,idy,idz])
-                                    if mark[index]:
-                                        p1 = pstart
-                                        p2 = point3D([ix,iy,iz,idx,idy,idz])
-                                        if p1==p2:
-                                            p2.valid = False
-                                        if p2.valid:
-                                            tr = trajectory3D(p1,p2)
-                                            tr.constrain_A()
-                                            if costtype == 'energy':
-                                                a =  tr.timeEvolution(ACC_ONLY=True)
-                                                tc = tr.cost_e(a)
-                                            elif costtype == 'time':
-                                                tc = tr.cost_t()
-                                            else:
-                                                error('unknown cost type (3D): '+costtype)
-                                            if tc < cmin:
-                                                cmin = tc
-                                                p2Cmin = p2
-                                                trCmin = tr
-                                                minidx = index
-                                                found = True
 
-            # we've found lowest cost cmin and that point
-            #
-            # make sure though:
-            if not found:
-                print('current index: ',index,'/', N**6)
-                error('I didnt find a minimum cost!!'+ str(count))
-            if not mark[minidx]:
-                error('new path point is marked already!')
-            if not p2.valid:
-                print('current index: ',index,'/', N**6)
-                error('path: trying to add invalid new point' + str(p2))
-            # future: go back and find all points with same cost as trCmin
-            if plen > 0:
-                pprev = self.path[-1].p2
-                pcurr = trCmin.p1
-                if pprev != pcurr:
-                    print('minidx: ', minidx)
-                    print('adding traj: ', trCmin)
-                    error('path trajectories dont connect! '+str(pprev))
-            # we've passed all the checks: append the traj to path
-            print('adding: ', plen, trCmin.p2)
-            mark[minidx] = False  # do not visit this point again
-            self.path.append(trCmin)
-            plen += 1
-            pstart = p2Cmin
-            self.Tcost += cmin
-        print('Path search completed!')
-        print('Total path cost ({:}) = {:8.2f}: '.format(costtype,self.Tcost))
+        if ADVANCED:
+            self.Tcost = 0.0
+            self.path = []
+            plen = 0
+            nmin_max = 0
+            while len(self.path) < N**6 - 1:
+                search = search_from_curr_pt(mark)
+                search.costtype = costtype
+                search.pstart = pstart
+                search.iterate(N,search.find_cmin)
+                search.iterate(N,search.find_all_cminTrs)
+                if len(search.minidxs) > nmin_max:
+                    nmin_max = len(search.minidxs)
+                ni,nr = search.select_next()
+                self.path.append(nr)
+                plen += 1
+                pstart = nr.p2
+                self.Tcost += search.cmin
+
+            print('\n\n       The longest set of min-cost next points was: {:} points\n\n'.format(nmin_max))
+            print('ADVANCED Path search completed!')
+            print('Total path cost ({:}) = {:8.2f}: '.format(costtype,self.Tcost))
+
+        if BASIC:
+            self.Tcost = 0.0
+            self.path = []
+            plen = 0
+            while len(self.path) < N**6-1:
+                # start adding next point to path list
+                cmin = 99999999
+                found = False
+                # search costs through the available next points:
+                for ix in range(N):
+                    for iy in range(N):
+                        for iz in range(N):
+                            for idx in range(N):
+                                for idy in range(N):
+                                    for idz in range(N):
+                                        index = getidx([ix,iy,iz,idx,idy,idz])
+                                        if mark[index]:
+                                            p1 = pstart
+                                            p2 = point3D([ix,iy,iz,idx,idy,idz])
+                                            if p1==p2:
+                                                p2.valid = False
+                                            if p2.valid:
+                                                #
+                                                #  simple greedy search:
+                                                #       take the first min value encountered
+                                                #       (multiple points may have ~= cost
+                                                #
+                                                tr = trajectory3D(p1,p2)
+                                                tr.constrain_A()
+                                                if costtype == 'energy':
+                                                    a =  tr.timeEvolution(ACC_ONLY=True)
+                                                    tc = tr.cost_e(a)
+                                                elif costtype == 'time':
+                                                    tc = tr.cost_t()
+                                                else:
+                                                    error('unknown cost type (3D): '+costtype)
+                                                if tc < cmin:
+                                                    cmin = tc
+                                                    p2Cmin = p2
+                                                    trCmin = tr
+                                                    minidx = index
+                                                    found = True
+
+                # we've found lowest cost cmin and that point
+                #
+                # make sure though:
+                if not found:
+                    print('current index: ',index,'/', N**6)
+                    error('I didnt find a minimum cost!!'+ str(count))
+                if not mark[minidx]:
+                    error('new path point is marked already!')
+                if not p2.valid:
+                    print('current index: ',index,'/', N**6)
+                    error('path: trying to add invalid new point' + str(p2))
+                # future: go back and find all points with same cost as trCmin
+                if plen > 0:
+                    pprev = self.path[-1].p2
+                    pcurr = trCmin.p1
+                    if pprev != pcurr:
+                        print('minidx: ', minidx)
+                        print('adding traj: ', trCmin)
+                        error('path trajectories dont connect! '+str(pprev))
+                # we've passed all the checks: append the traj to path
+                print('adding: ', plen, trCmin.p2)
+                mark[minidx] = False  # do not visit this point again
+                self.path.append(trCmin)
+                plen += 1
+                pstart = p2Cmin
+                self.Tcost += cmin
+            print('BASIC Path search completed!')
+            print('Total path cost ({:}) = {:8.2f}: '.format(costtype,self.Tcost))
 
     def check(self): # 3D
         if len(self.path) != M-1:
@@ -557,7 +678,7 @@ class path3D:
                 if tr is None:
                     error('null traj: '+ str(i) + str(tr))
                 if not tr.computed and not tr.constrained:
-                    error('Cant plot until trajectory is constrained '+ str(i) + str( p))
+                    error('Cant plot until trajectory is constrained: '+ str(i))
                 dt = tr.dt
                 for i in range(NPC):
                     t = dt*i/NPC
@@ -581,6 +702,7 @@ class path3D:
         df.metadata.d['AMAX']=AMAX
         df.metadata.d['N'] = N
         df.metadata.d['costtype'] = costtype
+        df.metadata.d['Advanced_searchtype'] = self.advflag
         if df.validate():
             print('Datafile is properly set up with valid metadata')
         else:
