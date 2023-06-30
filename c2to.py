@@ -526,7 +526,7 @@ class search_from_curr_pt:
     def find_all_cminTrs(self,index,ivect): # find a list of all next pts for which cost ~= cmin
         if not self.found:
             error('search.find_all_cminTrs: somethings wrong, need to find_cmin before find_all')
-        epsilon = self.cmin * 0.05 # define 'close'
+        epsilon = self.cmin * 0.02 # define 'close'
         if self.mark[index]:
             p1 = self.pstart
             p2 = point3D(ivect)
@@ -694,7 +694,7 @@ class path3D:
         x = self.compute_curves(-1) # save all trajectories
         print('path.save: x dims:', x.shape)
         col_names = ['n','X','Y','Z']
-        int_type = str(type(5))            # these have to be strings b/c json can't serialize types(!)
+        int_type = str(type(5))    # these have to be strings b/c json can't serialize types(!)
         float_type = str(type(3.14159))
         col_types = [ int_type, float_type, float_type, float_type]
         col_comments = ['','','','']

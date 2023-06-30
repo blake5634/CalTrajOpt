@@ -13,7 +13,7 @@ def main(args):
 
     # compute a path:
     #p = cto.path3d(gt,c1)
-    p = cto.path3D(adv=True)
+    p = cto.path3D(adv=False)
     # is it a valid path?
     #p.check()
 
