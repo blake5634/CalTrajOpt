@@ -9,7 +9,9 @@ __pycache__/
 *.pdf
 *.cfg
 *.png
-
+#
+#dependent package
+brl_data/
 # C extensions
 *.so
 

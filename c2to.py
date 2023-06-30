@@ -111,6 +111,8 @@ class point3D:
     def __init__(self,iv):
         if len(iv) != 6:
             error('point3D: invalid index vector')
+        if (N<3):
+            error('point3D class: N must be greater than 2')
         self.ix = iv[0]
         self.iy = iv[1]
         self.iz = iv[2]
@@ -456,7 +458,7 @@ class Cm:
         return res
 
 class search_from_curr_pt:
-    def __init__(self,Mark):
+    def __init__(self,Mark,path):
         self.costtype = 'None yet'
         self.pstart = None  # last known trajectory point (or initial point)
         self.cmin   = 99999999999
@@ -465,7 +467,7 @@ class search_from_curr_pt:
         self.minidxs = []
         self.found = False
         self.mark = Mark  # array to mark already chosen pts (True == still available)
-
+        self.path = path
 
     def iterate(self,N,function):
         def getidx(v):
@@ -502,26 +504,30 @@ class search_from_curr_pt:
             a =  tr.timeEvolution(ACC_ONLY=True)
             tc = tr.cost_e(a)
         elif self.costtype == 'time':
-            tc = tr.cost_t()
+            a = 0 # dummy for cost_t, needed for cost_e
+            tc = tr.cost_t(a)
         else:
             error('search:set_costtype: unknown cost type (3D): '+costtype)
         return tc
 
     def select_next(self):
         L = len(self.minTrs)
+        self.path.tie_freq[L] += 1  # count how many ties with each multiplicity L
+        if L != len(self.minidxs):
+            brl_error('min trajs and min indexs are different lengths')
         if L < 1:
             error('search.select_next: no next trajs identified yet. did you run find_all_cminTrs?')
         if L == 1:
             self.mark[self.minidx] = False
             return self.minidx, self.minTrs[0]
         # pick one at random
-        print('select_next: choosing a random min traj! from ',len(self.minidxs))
+        #print('select_next: choosing a random min traj! from ',len(self.minidxs))
         tr = random.choice(self.minTrs)   #
         if not tr.computed or not tr.constrained:
             error('select_next: trajectory is not comp or const.')
         ti = random.choice(self.minidxs)
         self.mark[ti] = False
-        return ti,tr
+        return ti,tr #chosen next traj index, chosen next traj trajectory
 
     def find_all_cminTrs(self,index,ivect): # find a list of all next pts for which cost ~= cmin
         if not self.found:
@@ -538,6 +544,8 @@ class search_from_curr_pt:
                 if abs(tc-self.cmin) < epsilon:
                     self.minTrs.append(tr)
                     self.minidxs.append(index)
+        if len(self.minTrs) > self.path.nmin_max:
+            self.path.nmin_max = len(self.minTrs)
 
 
 # find the path without filling up the cost matrix Cm
@@ -563,22 +571,46 @@ class path3D:
             self.Tcost = 0.0
             self.path = []
             plen = 0
-            nmin_max = 0
+            self.nmin_max = 0
+            self.tie_freq = np.zeros(40)  # how many times you have n-way tie
             while len(self.path) < N**6 - 1:
-                search = search_from_curr_pt(mark)
+                search = search_from_curr_pt(mark,self)
                 search.costtype = costtype
                 search.pstart = pstart
                 search.iterate(N,search.find_cmin)
                 search.iterate(N,search.find_all_cminTrs)
-                if len(search.minidxs) > nmin_max:
-                    nmin_max = len(search.minidxs)
                 ni,nr = search.select_next()
                 self.path.append(nr)
                 plen += 1
                 pstart = nr.p2
                 self.Tcost += search.cmin
 
-            print('\n\n       The longest set of min-cost next points was: {:} points\n\n'.format(nmin_max))
+            print('Distribution of tie choices: (',len(self.path),' points in path)')
+            print('  tie rank    |  how many times')
+            print('\n----------------------------------------')
+            sum = 0
+            medianflag = True
+            fmtstring1 = '{:8d}     |     {:8d} '
+            fmtstring2 = '{:8d}     |     {:8d} << median'
+            median=0
+            for i,n in enumerate(self.tie_freq):
+                median += n
+            median /=2
+
+            for i,n in enumerate(self.tie_freq):
+                sum += int(n)
+                if sum < median and medianflag :
+                    fmt = fmtstring1
+                elif medianflag:
+                    fmt = fmtstring2
+                    medianflag = False
+                else:
+                    fmt = fmtstring1
+                print(fmt.format(i,int(n)))
+
+
+            print('')
+            print('\n\n       The longest set of min-cost next points was: {:} points\n\n'.format(self.nmin_max))
             print('ADVANCED Path search completed!')
             print('Total path cost ({:}) = {:8.2f}: '.format(costtype,self.Tcost))
 
@@ -692,7 +724,8 @@ class path3D:
         df = bd.datafile(fname, 'BH', 'simulation')
         df.set_folders('','') # default local foldesr
         x = self.compute_curves(-1) # save all trajectories
-        print('path.save: x dims:', x.shape)
+        print('path.save: x points:     ',len(self.path))
+        print('path.save: x curves dims:', x.shape)
         col_names = ['n','X','Y','Z']
         int_type = str(type(5))    # these have to be strings b/c json can't serialize types(!)
         float_type = str(type(3.14159))
