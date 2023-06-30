@@ -6,11 +6,11 @@ p1 = cto.point2D(0,0)
 p2 = cto.point2D(3,1)
 
 
-p1.x = -0.333
+p1.x =  -2
 p1.v = -1
 
-p2.x = -1.0
-p2.v =  -0.333
+p2.x =  1.5
+p2.v =  +1.5
 
 tr = cto.trajectory2D(p1,p2)
 
