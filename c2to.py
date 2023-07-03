@@ -4,6 +4,7 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 import itertools as itt
+import datetime
 
 def error(msg):
     print('Error: ')
@@ -82,10 +83,19 @@ class grid2D:
 
 class point2D:
     def __init__(self,i,j):
+        if i > N or j>N or i<=-1 or j<=-1:
+            error('point2D i,j is too big: '+str(i)+' '+str(j)+ ' /'+str(N))
         self.row = i
         self.col = j
         self.x =     2*j/(N-1) - 1
         self.v = -1*(2*i/(N-1) - 1)
+        if self.x < -1.05 or self.x > 1.05:
+            msg = 'point2D: Im creating bogus point coordinates: '
+            msg += str(i) + '  '
+            msg += str(j) + '  '
+            msg += str(self.x) + '  '
+            msg += str(self.v) + '  '
+            error(msg)
         self.tr = None
 
     def __eq__(self,x):
@@ -98,7 +108,7 @@ class point2D:
 
 class trajectory2D:
     def __init__(self,p1,p2):
-        print('trajectory2D: p1,p2: ',p1,p2)
+        #print('trajectory2D: p1,p2: ',p1,p2)
         self.p1 = p1
         self.p2 = p2
         self.computed = False
@@ -161,8 +171,8 @@ class trajectory2D:
                 dt *= 1.02
             else:
                 break
-        print('Constrain_A: iterations: ', ni, ' dt = ', dt)
-        print('             self.get_Amax(dt):',self.get_Amax(dt))
+        #print('Constrain_A: iterations: ', ni, ' dt = ', dt)
+        #print('             self.get_Amax(dt):',self.get_Amax(dt))
         self.dt = dt
         self.constrained = True
         self.compute(self.dt) # because we changed dt
@@ -207,7 +217,7 @@ class trajectory2D:
     def __repr__(self):
         return str(self.p1) + ' ---> ' + str(self.p2)
 
-class Cm:
+class Cm: # matrix full of trajectory2D objs
     def __init__(self):
         self.m = [[ 0 for x in range(M)] for y in range(M)]
 
@@ -278,7 +288,8 @@ class quartile():
 
 class path:
     def __init__(self,grid,Cm):
-        self.Cm = Cm
+        self.Cm = Cm      # cost matrix (actually trajectories)
+        self.grid = grid
         self.sr = startrow
         self.sc = startcol
         self.mark = [True for x in range(M)]
@@ -289,80 +300,103 @@ class path:
 
     def bruteForce(self,Cm):
         print('Starting brute force: N=',N)
-
-        #1) list all possible paths
-        #list all nodes:
-        nodes = []
-        for i in range(N):
-            for j in range(N):
-                nodes.append([i,j])
+        LOWMEM = False
+        if N>3:
+            LOWMEM = True
+        LOWMEM=True #testing
+        ##1) list all possible paths
+        ##list all nodes:
+        #nodes = []
+        #for i in range(N):
+            #for j in range(N):
+                #nodes.append([i,j])
         print('We are about to find all paths through ',N*N,' nodes')
         x=input('ready?..')
         piter = itt.permutations(range(N*N),N*N) # not a list!
         print('Path enumeration complete:')
         n_all_paths = math.factorial(N*N)
-        print('There are ',n_all_paths,' possible paths')
+        print('There are {:12.3E} possible paths'.format(n_all_paths))
+        secPerLoop = 0.0003366 # measured on Intel box
+        print('   Estimated completion time: ',n_all_paths*secPerLoop,' sec.')
+        hrs = n_all_paths*secPerLoop/(60*60)
+        print('   Estimated completion time: ',hrs,' hrs.')
+        days = hrs/24
+        print('   Estimated completion time: ',days,' days.')
+        months = 12*days/365
+        print('   Estimated completion time: ',months,' months.')
+        years = months/12
+        print('   Estimated completion time: ',years,' years.')
+
         x=input('ready?..')
 
         #2) evaluate their costs
         path_costs = []
-        n = 0
+        n = -1
         cmin = 99999999999
         pmin = []
-        q1 = quartile() # cost quartiles
-        q2 = quartile()
-        q3 = quartile()
-        q4 = quartile()
-        rt1 = 10
-        rt2 = 12
-        rt3 = 16
-        rt4 = 18
-        for p in piter:
-            #print('path: ', p,end='')
+        SPEEDTEST = False
+        if SPEEDTEST:
+            Navg = 20000
+            ts1 = datetime.datetime.now()
+        for p in piter:  # piter returns set of points
+            p = list(p)
+            n += 1
+            #print('path: ',n, p)
             c = 0.0
+            tmpPath = []
             for i in range(len(p)-1):
+                # build next trajectory
+                row = p[i]//N
+                col = p[i]-row*N
+                p1 = point2D(row,col)
+                row = p[i+1]//N
+                col = p[i+1]-row*N
+                p2 = point2D(row,col)
+                tr = trajectory2D(p1,p2)
+                tr.constrain_A()
+                tmpPath.append(tr)
                 if costtype == 'energy':
-                    c += self.Cm.m[p[i]][p[i+1]].cost_e(a)
+                    c += tr.cost_e(a)
                 elif costtype == 'time':
-                    c += self.Cm.m[p[i]][p[i+1]].cost_t()
+                    c += tr.cost_t()
                 else:
                     error('unknown cost type: '+costtype)
-                #print('  cost:',ccost)
+            if SPEEDTEST and n > Navg:
+                break
+            if n%2000 == 0:
+                    print('path ',n)
             if c < cmin:
                 cmin = c
-                pmin = p
-            path_costs.append(c)
-            #print('  cost: ',c,'  min cost: ', cmin, pmin)
-            #if c < rt1:
-                #q1.add(c)
-            #elif rt1 <= c < rt2:
-                #q2.add(c)
-            #elif rt2 <= c < rt3:
-                #q3.add(c)
-            #else:
-                #q4.add(c)
+                pmin = path(self.grid,self.Cm)
+                pmin.path = tmpPath
+                pmin.Tcost = c
+                nmin = n
+            #print(' path cost: {:4.2f}'.format(c))
+            if not LOWMEM:
+                path_costs.append(c)
+        if SPEEDTEST:
+            print('timed {:} paths.'.format(Navg))
+            ts2 = datetime.datetime.now()
+            dt = (ts2-ts1).total_seconds()
+            print('seconds per {:} paths: {:}'.format(Navg, float(dt)))
+            print('seconds per path: {:}'.format(float(dt)/Navg))
+            quit()
+        if not LOWMEM:
+            print('quantiling the costs')
+            q = [0.25,0.5,0.75,1.0]
+            qs = np.quantile(path_costs, q )
 
-        print('quantiling the costs')
-        q = [0.25,0.5,0.75,1.0]
-        qs = np.quantile(path_costs, q )
-
-
-        # 4)  "anneal" the quartiles
-        #print('"Annealing" the quartiles')
-        #change2 = True
-        #while change2:
-            #qtsize = n_all_paths // 4
-            #change2 = q1.purge(qtsize, q2,None)
-            #change2 |= q2.purge(qtsize,q3,q1)
-            #change2 |= q3.purge(qtsize,q4,q2)
-            #change2 |= q4.purge(qtsize,None,q3)
-        print('Quartile Report:')
-        print('  Min:        {:4.1f}'.format( np.min(path_costs)))
-        print('    Q1: {:4.2f}  {:4.1f}'.format( q[0], qs[0]))
-        print('    Q2: {:4.2f}  {:4.1f}'.format( q[1], qs[1]))
-        print('    Q3: {:4.2f}  {:4.1f}'.format( q[2], qs[2]))
-        print('    Q4: {:4.2f}  {:4.1f}'.format( q[3], qs[3]))
-        print('  Max:        {:4.1f}'.format( np.max(path_costs)))
+            print('Quartile Report:')
+            print('  Min:        {:4.1f}'.format( np.min(path_costs)))
+            print('    Q1: {:4.2f}  {:4.1f}'.format( q[0], qs[0]))
+            print('    Q2: {:4.2f}  {:4.1f}'.format( q[1], qs[1]))
+            print('    Q3: {:4.2f}  {:4.1f}'.format( q[2], qs[2]))
+            print('    Q4: {:4.2f}  {:4.1f}'.format( q[3], qs[3]))
+            print('  Max:        {:4.1f}'.format( np.max(path_costs)))
+        else:
+            print('Lowest cost path: ')
+            print(pmin, 'path cost: ', cmin)
+        return pmin,cmin
 
     def heuristicSearch(self):
         crow = self.sr*N + self.sc  # starting point in cost matrix
@@ -458,11 +492,11 @@ class path:
         return curvepts_x,curvepts_v
 
 
-    def plot(self,idx):
+    def plot(self,idx): # plot a path with trajectories
         x_values = [point.p1.x for point in self.path]  # starting values
         y_values = [point.p1.v for point in self.path]
-        x_values.append(self.path[-1].p2.x)
-        y_values.append(self.path[-1].p2.v)
+        #x_values.append(self.path[-1].p2.x)
+        #y_values.append(self.path[-1].p2.v)
 
         print('plotting {:} xy values.'.format(len(x_values)))
 

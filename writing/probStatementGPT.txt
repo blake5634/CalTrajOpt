@@ -24,7 +24,8 @@ Exact Algorithms:
 Dynamic Programming: One approach is to use dynamic programming to solve the rectilinear TSP. This method exploits the grid structure and computes optimal solutions by considering all possible subproblems. However, the dynamic programming approach becomes computationally expensive as the number of grid points increases due to the exponential growth of subproblems.
 Approximation Algorithms:
 
-Minimum Spanning Trees: The rectilinear TSP can be approximated using a minimum spanning tree (MST). Algorithms based on the MST construct a spanning tree connecting all the grid points and then find an Eulerian tour on the tree, which can be transformed into a Hamiltonian tour (visiting each point exactly once). The MST-based algorithms provide constant-factor approximations with efficient runtime.
+
+: The rectilinear TSP can be approximated using a minimum spanning tree (MST). Algorithms based on the MST construct a spanning tree connecting all the grid points and then find an Eulerian tour on the tree, which can be transformed into a Hamiltonian tour (visiting each point exactly once). The MST-based algorithms provide constant-factor approximations with efficient runtime.
 
 Path Concatenation: Another approximation technique is to divide the grid into smaller subgrids and find Hamiltonian tours within each subgrid. The tours are then concatenated in a way that ensures all the points are covered. Path concatenation algorithms provide good approximations but may not guarantee an optimal solution.
 

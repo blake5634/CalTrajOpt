@@ -22,12 +22,15 @@ def main(args):
     # compute a path:
     p = cto.path(gt,c1)
     #p.heuristicSearch()
-    p.bruteForce(c1)
+    path2, cmin = p.bruteForce(c1)
+    path2.Tcost = cmin
+
     # is it a valid path?
-    p.check()
+    #p.check()
 
     # graph the path
-    p.plot(idx)
+    path2.plot(idx)
+    #p.plot(idx)
 
 
 
