@@ -1,7 +1,9 @@
 #!/usr/bin/python3
 
 import numpy as np
+import math
 import matplotlib.pyplot as plt
+import itertools as itt
 
 def error(msg):
     print('Error: ')
@@ -239,6 +241,40 @@ class Cm:
             res += '\n'
         return res
 
+class quartile():
+    def __init__(self):
+        self.qset = set()
+        self.n = 0
+
+    def add(self,c):
+        self.qset.add(c)
+        self.n += 1
+
+    def purge(self,NptsQtile,sbelow, sabove):
+        change = False
+        big = False
+        if self.n > NptsQtile:
+            big = True
+            smax = -1
+            smin = 9999999999999
+            for se in self.qset:
+                if  se > smax:
+                    smax = se
+                if  se < smin:
+                    smin = se
+        if big and sbelow:
+            sbelow.qset.add(smin)
+            self.qset.remove(smin)
+            self.n -= 1
+            change = True
+        if big and sabove:
+            if smax == -1:
+                error('somethings wrong with quartile '+str(self.n)+', '+str(self.qset))
+            sabove.qset.add(smax)
+            self.qset.remove(smax)
+            self.n -= 1
+            change = True
+        return change
 
 class path:
     def __init__(self,grid,Cm):
@@ -250,6 +286,83 @@ class path:
         self.mark[self.sr*N+self.sc] = False # mark our starting point
         self.Tcost = 0.0
         self.path = []
+
+    def bruteForce(self,Cm):
+        print('Starting brute force: N=',N)
+
+        #1) list all possible paths
+        #list all nodes:
+        nodes = []
+        for i in range(N):
+            for j in range(N):
+                nodes.append([i,j])
+        print('We are about to find all paths through ',N*N,' nodes')
+        x=input('ready?..')
+        piter = itt.permutations(range(N*N),N*N) # not a list!
+        print('Path enumeration complete:')
+        n_all_paths = math.factorial(N*N)
+        print('There are ',n_all_paths,' possible paths')
+        x=input('ready?..')
+
+        #2) evaluate their costs
+        path_costs = []
+        n = 0
+        cmin = 99999999999
+        pmin = []
+        q1 = quartile() # cost quartiles
+        q2 = quartile()
+        q3 = quartile()
+        q4 = quartile()
+        rt1 = 10
+        rt2 = 12
+        rt3 = 16
+        rt4 = 18
+        for p in piter:
+            #print('path: ', p,end='')
+            c = 0.0
+            for i in range(len(p)-1):
+                if costtype == 'energy':
+                    c += self.Cm.m[p[i]][p[i+1]].cost_e(a)
+                elif costtype == 'time':
+                    c += self.Cm.m[p[i]][p[i+1]].cost_t()
+                else:
+                    error('unknown cost type: '+costtype)
+                #print('  cost:',ccost)
+            if c < cmin:
+                cmin = c
+                pmin = p
+            path_costs.append(c)
+            #print('  cost: ',c,'  min cost: ', cmin, pmin)
+            #if c < rt1:
+                #q1.add(c)
+            #elif rt1 <= c < rt2:
+                #q2.add(c)
+            #elif rt2 <= c < rt3:
+                #q3.add(c)
+            #else:
+                #q4.add(c)
+
+        print('quantiling the costs')
+        q = [0.25,0.5,0.75,1.0]
+        qs = np.quantile(path_costs, q )
+
+
+        # 4)  "anneal" the quartiles
+        #print('"Annealing" the quartiles')
+        #change2 = True
+        #while change2:
+            #qtsize = n_all_paths // 4
+            #change2 = q1.purge(qtsize, q2,None)
+            #change2 |= q2.purge(qtsize,q3,q1)
+            #change2 |= q3.purge(qtsize,q4,q2)
+            #change2 |= q4.purge(qtsize,None,q3)
+        print('Quartile Report:')
+        print('  Min:        {:4.1f}'.format( np.min(path_costs)))
+        print('    Q1: {:4.2f}  {:4.1f}'.format( q[0], qs[0]))
+        print('    Q2: {:4.2f}  {:4.1f}'.format( q[1], qs[1]))
+        print('    Q3: {:4.2f}  {:4.1f}'.format( q[2], qs[2]))
+        print('    Q4: {:4.2f}  {:4.1f}'.format( q[3], qs[3]))
+        print('  Max:        {:4.1f}'.format( np.max(path_costs)))
 
     def heuristicSearch(self):
         crow = self.sr*N + self.sc  # starting point in cost matrix
