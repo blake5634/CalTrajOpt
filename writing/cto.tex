@@ -277,15 +277,15 @@ We define the following classes:
 This version of the traveling salesman problem is clearly asymmetric as it is
 easy to find pairs of phase space points for which
 \beq
-C_x (P_1,P_2) \neq C_x (P2,P1)
+C_x (P_1,P_2) \neq C_x (P_2,P_1)
 \eeq
-and it is known \cite{}  that greedy algorithms can perform very badly for asymmetric or
-non-Euclidean graphs.
+and it is known \cite{}  that greedy algorithms can perform very badly
+for some asymmetric or non-Euclidean graphs.
 
 For small problem domains we can find the global optimumum Hamiltonian tour
 through a brute force search and compare it with our heuristic.
 
-\paragraph{Problem \ref{prob:global}}
+\paragraph{Problem 1}
 For the 2D rectangular grid in phase space (1D position, 1D velocity),
 find the optimal path via brute force search for all possible starting points
 and compare its cost to
@@ -297,7 +297,7 @@ In our application, a robot must be initialized and then incur a small cost
 (compared to the overall trajectory cost) to more to the starting point
 selected for an optimal path.
 
-\paragraph{Problem \ref{prob:startingpt}}
+\paragraph{Problem 2}
 For both the 2D and 6D grids, initialize the heuristic at several starting
 points and compute
 mean and variance of total path cost.

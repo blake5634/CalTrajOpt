@@ -163,7 +163,7 @@ class trajectory2D:
         print('             self.get_Amax(dt):',self.get_Amax(dt))
         self.dt = dt
         self.constrained = True
-        self.compute(self.dt)
+        self.compute(self.dt) # because we changed dt
         return dt
 
     def timeEvolution(self):
@@ -242,29 +242,32 @@ class Cm:
 
 class path:
     def __init__(self,grid,Cm):
-        sr = startrow
-        sc = startcol
-        mark = [True for x in range(M)]
+        self.Cm = Cm
+        self.sr = startrow
+        self.sc = startcol
+        self.mark = [True for x in range(M)]
         count = 0
-        mark[sr*N+sc] = False # mark our starting point
+        self.mark[self.sr*N+self.sc] = False # mark our starting point
         self.Tcost = 0.0
         self.path = []
-        crow = sr*N + sc  # starting point in cost matrix
-        firstrow = crow
+
+    def heuristicSearch(self):
+        crow = self.sr*N + self.sc  # starting point in cost matrix
+        firstrow = self.sr*N + self.sc
         while len(self.path) < M-1:
             print('looking for next path pt: row: ',crow)
             cmin = 99999999
             cminidx = 0
             found = False
             for ccol in range(M):
-                if mark[ccol]:
-                    if Cm.m[crow][ccol].valid:  # first attempt: pick first min cost traj.
+                if self.mark[ccol]:
+                    if self.Cm.m[crow][ccol].valid:  # first attempt: pick first min cost traj.
                                                            # and elim self transitions
-                        x,v,a,t = Cm.m[crow][ccol].timeEvolution()
+                        x,v,a,t = self.Cm.m[crow][ccol].timeEvolution()
                         if costtype == 'energy':
-                            ccost = Cm.m[crow][ccol].cost_e(a)
+                            ccost = self.Cm.m[crow][ccol].cost_e(a)
                         elif costtype == 'time':
-                            ccost = Cm.m[crow][ccol].cost_t()
+                            ccost = self.Cm.m[crow][ccol].cost_t()
                         else:
                             error('unknown cost type: '+costtype)
                         #print('  cost:',ccost)
@@ -275,13 +278,13 @@ class path:
                             found = True
             if not found:
                 error('I didnt find a minimum cost!!'+ str(count))
-            if not mark[cminidx]:
+            if not self.mark[cminidx]:
                 error('new path point is marked already')
-            mark[cminidx] = False  # do not visit this point again
-            if not Cm.m[crow][cminidx].valid:
+            self.mark[cminidx] = False  # do not visit this point again
+            if not self.Cm.m[crow][cminidx].valid:
                 print('crow', crow, 'ccol: ', ccol)
                 error('path: invalid new point')
-            t = Cm.m[crow][cminidx]
+            t = self.Cm.m[crow][cminidx]
             if crow != firstrow:
                 pprev = self.path[-1].p2
                 pcurr = t.p1
@@ -421,6 +424,8 @@ def tests():
 
     # try a path:
     p = path(gt,c1,r,c)
+    p.heuristicSearch()
+
     print(p)
 
 

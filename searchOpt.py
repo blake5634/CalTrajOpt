@@ -21,6 +21,7 @@ def main(args):
 
     # compute a path:
     p = cto.path(gt,c1)
+    p.heuristicSearch()
     # is it a valid path?
     p.check()
 
