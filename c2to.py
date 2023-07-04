@@ -304,19 +304,17 @@ class path:
         if N>3:
             LOWMEM = True
         LOWMEM=True #testing
+
+        SPEEDTEST = False  # just run 2000 paths to measure speed
         ##1) list all possible paths
-        ##list all nodes:
-        #nodes = []
-        #for i in range(N):
-            #for j in range(N):
-                #nodes.append([i,j])
         print('We are about to find all paths through ',N*N,' nodes')
         x=input('ready?..')
         piter = itt.permutations(range(N*N),N*N) # not a list!
         print('Path enumeration complete:')
         n_all_paths = math.factorial(N*N)
         print('There are {:12.3E} possible paths'.format(n_all_paths))
-        secPerLoop = 0.0003366 # measured on Intel box
+        secPerLoop = 0.0003366 # measured on IntelNUC
+        secPerLoop = 0.0008419 # Dell XPS-13
         print('   Estimated completion time: ',n_all_paths*secPerLoop,' sec.')
         hrs = n_all_paths*secPerLoop/(60*60)
         print('   Estimated completion time: ',hrs,' hrs.')
@@ -334,7 +332,6 @@ class path:
         n = -1
         cmin = 99999999999
         pmin = []
-        SPEEDTEST = False
         if SPEEDTEST:
             Navg = 20000
             ts1 = datetime.datetime.now()
