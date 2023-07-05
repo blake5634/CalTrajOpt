@@ -7,9 +7,6 @@ import sys
 
 
 def main(args):
-    SEARCHT = 'heuristic search'
-    #SEARCHT = 'brute force'
-
     # create a path and plot it graphically
     cto.configure()
     idx = int(args[1])
@@ -24,17 +21,15 @@ def main(args):
 
     # compute a path:
     p = cto.path(gt,c1)
-
-    if SEARCHT.startswith('heur'):
-        path2, cmin = p.heuristicSearch()
-    elif SEARCHT.startswith('brute'):
-        path2, cmin = p.bruteForce(c1)
+    #p.heuristicSearch()
+    path2, cmin = p.bruteForce(c1)
+    path2.Tcost = cmin
 
     # is it a valid path?
     #p.check()
 
     # graph the path
-    path2.plot(idx,SEARCHT)
+    path2.plot(idx)
     #p.plot(idx)
 
 

@@ -299,7 +299,7 @@ class path:
         self.Tcost = 0.0
         self.path = []
 
-    def bruteForce(self,Cm):
+    def bruteForce(self,Cm): # path class
         print('Starting brute force: N=',N)
 
         LOWMEM = False
@@ -427,12 +427,13 @@ class path:
             dfbf.metadata.d['Max Cost']=maxCost
             dfbf.metadata.d['Quartiles']=list(qs)
             dfbf.close()
-        return pmin,cmin
+        return pmin, pmin.Tcost
 
-    def heuristicSearch(self):
+    def heuristicSearch(self):  # path class
+        # add to self.path[] one traj at a time greedily
         crow = self.sr*N + self.sc  # starting point in cost matrix
         firstrow = self.sr*N + self.sc
-        while len(self.path) < M-1:
+        while len(self.path) < M-1: # build path up one pt at a time
             print('looking for next path pt: row: ',crow)
             cmin = 99999999
             cminidx = 0
@@ -462,11 +463,11 @@ class path:
             if not self.Cm.m[crow][cminidx].valid:
                 print('crow', crow, 'ccol: ', ccol)
                 error('path: invalid new point')
-            t = self.Cm.m[crow][cminidx]
-            if crow != firstrow:
+            t = self.Cm.m[crow][cminidx]  # get current best trajectory
+            if crow != firstrow:  # no trajectory has t.p2=startPoint
                 pprev = self.path[-1].p2
                 pcurr = t.p1
-                if pprev != pcurr:
+                if pprev != pcurr: # check for error
                     print('crow/firstrow: ', crow, firstrow)
                     print('adding traj: ', t)
                     error('path trajectories dont connect! '+str(crow))
@@ -475,6 +476,7 @@ class path:
             crow = cminidx
             self.Tcost += cmin
             print('Total path cost ({:}) = {:8.2f}: '.format(costtype,self.Tcost))
+        return self, self.Tcost
 
     def check(self):
         if len(self.path) != M-1:
@@ -523,18 +525,18 @@ class path:
         return curvepts_x,curvepts_v
 
 
-    def plot(self,idx): # plot a path with trajectories
+    def plot(self,idx, note=''): # plot a path with trajectories
         x_values = [point.p1.x for point in self.path]  # starting values
         y_values = [point.p1.v for point in self.path]
-        #x_values.append(self.path[-1].p2.x)
-        #y_values.append(self.path[-1].p2.v)
+        x_values.append(self.path[-1].p2.x)
+        y_values.append(self.path[-1].p2.v)
 
         print('plotting {:} xy values.'.format(len(x_values)))
 
         plt.plot(x_values, y_values, 'o')
         plt.xlabel('X')
         plt.ylabel('\dot{X}')
-        plt.title('Path through Grid: minimize {:}  Amax = {:2.1f} '.format(costtype,AMAX))
+        plt.title('Path through Grid: minimize {:}  Amax = {:2.1f}\n            {:} '.format(costtype,AMAX,note))
         plt.grid(True)
 
 
