@@ -5,6 +5,7 @@ import math
 import matplotlib.pyplot as plt
 import itertools as itt
 import datetime
+import brl_data.brl_data as bd
 
 def error(msg):
     print('Error: ')
@@ -300,12 +301,33 @@ class path:
 
     def bruteForce(self,Cm):
         print('Starting brute force: N=',N)
+
         LOWMEM = False
         if N>3:
             LOWMEM = True
-        LOWMEM=True #testing
 
         SPEEDTEST = False  # just run 2000 paths to measure speed
+
+        STOREDATA = True   # write all perms and costs to a data file
+
+        if STOREDATA:
+            dfbf = bd.datafile('TSP_perms','BH','simulation')
+            dataFolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS'
+            codeFolder = ''
+            dfbf.set_folders(dataFolder,codeFolder)
+            print('Saving permutations (paths) to: ',dfbf.name)
+            itype = str(type(5))
+            ftype = str(type(3.1415))
+            tps = [itype]*(N*N)      # path point seq
+            names = [' ']*(N*N)
+            tps.append(ftype) # the path cost's type
+            names.append('Cost')
+            dfbf.metadata.d['Types'] = tps
+            dfbf.metadata.d['Names'] = names
+            dfbf.metadata.d['CostType'] = costtype
+            #
+            dfbf.open()  # let's open the file (default is for writing)
+
         ##1) list all possible paths
         print('We are about to find all paths through ',N*N,' nodes')
         x=input('ready?..')
@@ -353,6 +375,7 @@ class path:
                 tr.constrain_A()
                 tmpPath.append(tr)
                 if costtype == 'energy':
+                    x,v,a,t = tr.timeEvolution()
                     c += tr.cost_e(a)
                 elif costtype == 'time':
                     c += tr.cost_t()
@@ -362,6 +385,10 @@ class path:
                 break
             if n%2000 == 0:
                     print('path ',n)
+            if STOREDATA:
+                row = p
+                row.append(c)
+                dfbf.write(row)
             if c < cmin:
                 cmin = c
                 pmin = path(self.grid,self.Cm)
@@ -382,17 +409,24 @@ class path:
             print('quantiling the costs')
             q = [0.25,0.5,0.75,1.0]
             qs = np.quantile(path_costs, q )
-
+            minCost= np.min(path_costs)
+            maxCost= np.max(path_costs)
             print('Quartile Report:')
-            print('  Min:        {:4.1f}'.format( np.min(path_costs)))
+            print('  Min:        {:4.1f}'.format( minCost))
             print('    Q1: {:4.2f}  {:4.1f}'.format( q[0], qs[0]))
             print('    Q2: {:4.2f}  {:4.1f}'.format( q[1], qs[1]))
             print('    Q3: {:4.2f}  {:4.1f}'.format( q[2], qs[2]))
             print('    Q4: {:4.2f}  {:4.1f}'.format( q[3], qs[3]))
-            print('  Max:        {:4.1f}'.format( np.max(path_costs)))
-        else:
-            print('Lowest cost path: ')
+            print('  Max:        {:4.1f}'.format( maxCost ))
+        else: # not enough memory for quartiles(!)
+            print('Lowest cost path: ', p)
             print(pmin, 'path cost: ', cmin)
+
+        if STOREDATA:
+            dfbf.metadata.d['Min Cost']=minCost
+            dfbf.metadata.d['Max Cost']=maxCost
+            dfbf.metadata.d['Quartiles']=list(qs)
+            dfbf.close()
         return pmin,cmin
 
     def heuristicSearch(self):
