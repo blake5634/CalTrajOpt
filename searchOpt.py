@@ -26,12 +26,7 @@ def main(args):
     # compute a path:
     p = cto.path(gt,c1)
 
-    if SEARCHT.startswith('heur'):
-        path2, cmin = p.heuristicSearch()
-    elif SEARCHT.startswith('brute'):
-        path2, cmin = p.bruteForce(c1)
-    elif SEARCHT.startswith('sampling'):
-        path2, cmin = p.sampleSearch(c1,ns=50000)
+    path2, cmin = p.search(SEARCHT, ns=50000)
 
     # is it a valid path?
     #p.check()

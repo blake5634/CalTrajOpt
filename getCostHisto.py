@@ -75,7 +75,17 @@ def main(args):
     for i,b in enumerate(bins):
         if i>0:
             print('{:3d} {:5.2f} - {:5.2f} | {:}'.format(i,fullims[i-1],fullims[i],b))
+    #df.metadata.d['CostHistogram_values'] = bins
+    #df.metadata.d['CostHistogram_levels'] = list(fullims)
+    df.metadata.d['CostHistogram_values_levels'] = zip(bins,list(fullims))
+    df.close()
 
+    if True:  #CSV version
+        print('\n\n    CSV version\n')
+        for i,b in enumerate(bins):
+            if i>0:
+                print('{:5.2f}, {:}'.format(fullims[i-1],b))
+    print('\n\n')
 
 
 

@@ -306,13 +306,26 @@ class path:
         self.mark[self.sr*N+self.sc] = False # mark our starting point
         self.Tcost = 0.0
         self.path = []
+        self.searchtype = 'none yet'
 
-    def sampleSearch(self,Cm,ns=1000):
-        return self.bruteForce(Cm,sampling=True,n=ns)
+    def search(self,searchtype,ns=1000):
+        if searchtype.startswith('heur'):
+            p, cmin = self.heuristicSearch()
+        elif searchtype.startswith('brute'):
+            p, cmin = self.bruteForce()
+        elif searchtype.startswith('sampling'):
+            p, cmin = self.sampleSearch(ns=50000)
+        self.searchtype = searchtype
+        return p,cmin
 
-    def bruteForce(self,Cm,sampling=False,n=0): # path class
+    def sampleSearch(self,ns=1000):
+        return self.bruteForce(sampling=True,n=ns)
+
+    def bruteForce(self,sampling=False,n=0): # path class
+        if self.searchtype.startswith('none'):
+            self.searchtype = 'brute force'
         n_all_paths = math.factorial(N*N)
-        print('Starting brute force: N=',N)
+        print('Starting {:} search: N={:}'.format(self.searchtype,N))
         if sampling:
             print('   Sampling {:} paths out of {:12.5e}'.format(n,float(n_all_paths)))
 
@@ -339,6 +352,9 @@ class path:
             dfbf.metadata.d['Types'] = tps
             dfbf.metadata.d['Names'] = names
             dfbf.metadata.d['CostType'] = costtype
+            dfbf.metadata.d['SearchType'] = self.searchtype
+            dfbf.metadata.d['#samples'] = n
+
             #
             dfbf.open()  # let's open the file (default is for writing)
 
