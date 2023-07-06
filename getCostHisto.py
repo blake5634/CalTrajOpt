@@ -72,12 +72,12 @@ def main(args):
 
     print('Cost histogram: {:}'.format(df.metadata.d['CostType']))
     fullims = np.append(np.array([cmin]),binlims)
+
     for i,b in enumerate(bins):
         if i>0:
             print('{:3d} {:5.2f} - {:5.2f} | {:}'.format(i,fullims[i-1],fullims[i],b))
-    #df.metadata.d['CostHistogram_values'] = bins
-    #df.metadata.d['CostHistogram_levels'] = list(fullims)
-    df.metadata.d['CostHistogram_values_levels'] = zip(bins,list(fullims))
+    df.metadata.d['CostHistogram_values'] = bins
+    df.metadata.d['CostHistogram_levels'] = list(fullims)
     df.close()
 
     if True:  #CSV version
