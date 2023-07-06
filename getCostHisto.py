@@ -62,13 +62,27 @@ def main(args):
     binlims = np.append(binlims,cmax)
     print('working with bin limits: ',binlims)
     x = input('pause ...')
+
+    sum1 = 0.0  # sum of c
+    sum2 = 0.0  # sum of c^2
+    n = 0
     for row in df.reader:  # this is set up by the line df.open('r',tname=dfname)
         df.print_row(row)  # automatically formats the row according to types in metadata
-        c = row[9]
+        c = row[-1]
         for i,bl in enumerate(binlims):
             if c < bl:
                 bins[i] += 1
                 break
+        #accumulate sums and count
+        sum1 += c
+        sum2 += c*c
+        n += 1
+    mean = sum1/n
+    sd   = np.sqrt((n*sum2-sum1*sum1)/(n*(n-1)))  # sample sd
+
+    print('Mean: {:5.2f}   sd:  {:5.2f}'.format(mean,sd))
+    df.metadata.d['CostMean'] = mean
+    df.metadata.d['CostStDev'] = sd
 
     print('Cost histogram: {:}'.format(df.metadata.d['CostType']))
     fullims = np.append(np.array([cmin]),binlims)
