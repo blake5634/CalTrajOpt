@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import itertools as itt
 import datetime
 import brl_data.brl_data as bd
+import random
 
 def error(msg):
     print('Error: ')
@@ -306,8 +307,14 @@ class path:
         self.Tcost = 0.0
         self.path = []
 
-    def bruteForce(self,Cm): # path class
+    def sampleSearch(self,Cm,ns=1000):
+        return self.bruteForce(Cm,sampling=True,n=ns)
+
+    def bruteForce(self,Cm,sampling=False,n=0): # path class
+        n_all_paths = math.factorial(N*N)
         print('Starting brute force: N=',N)
+        if sampling:
+            print('   Sampling {:} paths out of {:12.5e}'.format(n,float(n_all_paths)))
 
         LOWMEM = False
         if N>3:
@@ -336,12 +343,27 @@ class path:
             dfbf.open()  # let's open the file (default is for writing)
 
         ##1) list all possible paths
-        print('We are about to find all paths through ',N*N,' nodes')
-        x=input('ready?..')
-        piter = itt.permutations(range(N*N),N*N) # not a list!
+        if not sampling:
+            print('We are about to find all paths through ',N*N,' nodes')
+            x=input('ready?..')
+            piter = itt.permutations(range(N*N),N*N) # not a list!
+        else:
+            print('We are generating {:} random paths through {:} nodes'.format(n,N*N))
+            m = N*N
+            piter = []
+            phashlist = []
+            for i in range(n):
+                p = list(range(N*N))
+                random.shuffle(p)
+                pthash = 0
+                for j in p:
+                    pthash += j
+                    pthash *= N*N
+                if pthash not in phashlist: # we've found a new pt
+                    piter.append(p)
+                    phashlist.append(pthash)
+
         print('Path enumeration complete:')
-        n_all_paths = math.factorial(N*N)
-        print('There are {:12.3E} possible paths'.format(n_all_paths))
         secPerLoop = 0.0003366 # measured on IntelNUC
         secPerLoop = 0.0008419 # Dell XPS-13
         print('   Estimated completion time: ',n_all_paths*secPerLoop,' sec.')

@@ -7,8 +7,9 @@ import sys
 
 
 def main(args):
-    SEARCHT = 'heuristic search'
+    #SEARCHT = 'heuristic search'
     #SEARCHT = 'brute force'
+    SEARCHT = 'sampling search'
 
     # create a path and plot it graphically
     cto.configure()
@@ -29,6 +30,8 @@ def main(args):
         path2, cmin = p.heuristicSearch()
     elif SEARCHT.startswith('brute'):
         path2, cmin = p.bruteForce(c1)
+    elif SEARCHT.startswith('sampling'):
+        path2, cmin = p.sampleSearch(c1,ns=50000)
 
     # is it a valid path?
     #p.check()
