@@ -13,7 +13,6 @@ def error(msg):
     quit()
 
 N = 4
-M = N*N  # number of distances
 
 AMAX = 2  #  normalize for now.
 DT_TEST = 2.0
@@ -28,7 +27,7 @@ startrow = 3
 startcol = 1
 
 def configure(fp=None):
-    global costtype, AMAX, DT_TEST, N,M, NPC, startrow, startcol
+    global costtype, AMAX, DT_TEST, N, NPC, startrow, startcol
     if not fp:
         f = open('ctoConfig.txt','r')
     else:
@@ -60,7 +59,12 @@ def configure(fp=None):
         if parname == 'startcol':
             startcol = int(v)
 
-
+def ij2idx(i,j):
+    return i*N+j
+def idx2ij(idx):
+    i = idx//N
+    j = idx-N*i
+    return i,j
 
 
 class grid2D:
@@ -220,14 +224,17 @@ class trajectory2D:
 
 class Cm: # matrix full of trajectory2D objs
     def __init__(self):
-        self.m = [[ 0 for x in range(M)] for y in range(M)]
+        self.m = [[ 0 for x in range(N*N)] for y in range(N*N)]
 
     def fill(self, grid):
-        print('starting fill...')
+        print('starting fill...{:}x{:}'.format(N,N))
         for i1 in range(N):  # go through first points
             for j1 in range(N):
                 for i2 in range(N):  # for all 2nd points
                     for j2 in range(N):
+                        m=max(i1,j1,i2,j2)
+                        if m>N-1:
+                            error('index too big: {:}/{:}'.format(m,N))
                         r = i1*N + j1
                         c = i2*N + j2
                         #print('r,c:',r,c)
@@ -246,8 +253,8 @@ class Cm: # matrix full of trajectory2D objs
 
     def __repr__(self):
         res = 'Cm cost matrix:\n'
-        for i in range(M):
-            for j in range(M):
+        for i in range(N*N):
+            for j in range(N*N):
                 res += ' {:5.1f}'.format(self.m[i][j].cost_t)
             res += '\n'
         return res
@@ -293,7 +300,7 @@ class path:
         self.grid = grid
         self.sr = startrow
         self.sc = startcol
-        self.mark = [True for x in range(M)]
+        self.mark = [True for x in range(N*N)]
         count = 0
         self.mark[self.sr*N+self.sc] = False # mark our starting point
         self.Tcost = 0.0
@@ -433,12 +440,12 @@ class path:
         # add to self.path[] one traj at a time greedily
         crow = self.sr*N + self.sc  # starting point in cost matrix
         firstrow = self.sr*N + self.sc
-        while len(self.path) < M-1: # build path up one pt at a time
+        while len(self.path) < N*N-1: # build path up one pt at a time
             print('looking for next path pt: row: ',crow)
             cmin = 99999999
             cminidx = 0
             found = False
-            for ccol in range(M):
+            for ccol in range(N*N):
                 if self.mark[ccol]:
                     if self.Cm.m[crow][ccol].valid:  # first attempt: pick first min cost traj.
                                                            # and elim self transitions
@@ -479,7 +486,7 @@ class path:
         return self, self.Tcost
 
     def check(self):
-        if len(self.path) != M-1:
+        if len(self.path) != N*N-1:
             error('wrong path length '+str(len(self.path)))
         i=0
         for t in self.path:
@@ -503,10 +510,16 @@ class path:
         return r
 
     def compute_curves(self,idx):
+        if type(idx) == type(5):
+            idx = [idx]
+        elif type(idx) != type([5]):
+            error('compute_curves: idx is not an int or a list')
         curvepts_x = []
         curvepts_v = []
+        if idx[0] < 0: # idx=-1 is a flag for all of the path
+            idx = range(len(self.path))
         for i,tr in enumerate(self.path):
-            if i == idx or idx < 0:
+            if i in idx:
                 if i == len(self.path):
                     break
                 if not tr.valid:
@@ -514,7 +527,7 @@ class path:
                 if tr is None:
                     error('null traj: '+ str(i) + str(tr))
                 if not tr.computed and not tr.constrained:
-                    error('Cant plot until trajectory is computed and constrained '+ str(i) + str( p))
+                    error('Cant plot until trajectory is computed and constrained '+ str(i) + str(tr))
                 dt = tr.dt
                 for i in range(NPC):
                     t = dt*i/NPC
@@ -526,31 +539,35 @@ class path:
 
 
     def plot(self,idx, note=''): # plot a path with trajectories
+        self.plotOnePath(self.plotSetup(note))
+        self.plotDone()
+
+    def plotSetup(self,note):
+        fig = plt.figure()
+        plt.title('Path through Grid: minimize {:}  Amax = {:2.1f}\n            {:} '.format(costtype,AMAX,note))
+        plt.xlabel('X')
+        plt.ylabel('\dot{X}')
+        plt.grid(True)
+        return fig
+
+    def plotOnePath(self,fig):
         x_values = [point.p1.x for point in self.path]  # starting values
         y_values = [point.p1.v for point in self.path]
         x_values.append(self.path[-1].p2.x)
         y_values.append(self.path[-1].p2.v)
-
-        print('plotting {:} xy values.'.format(len(x_values)))
-
-        plt.plot(x_values, y_values, 'o')
-        plt.xlabel('X')
-        plt.ylabel('\dot{X}')
-        plt.title('Path through Grid: minimize {:}  Amax = {:2.1f}\n            {:} '.format(costtype,AMAX,note))
-        plt.grid(True)
-
-
+        ax = plt.gca()
+        ax.plot(x_values, y_values, 'o')
         arrow_positions = np.array([x_values, y_values]).T
         arrow_directions = np.diff(arrow_positions, axis=0)
 
         # Plot arrows on the path at regular intervals
-        arrow_interval = len(self.path) // (M-1) # Change 5 to adjust the arrow density
+        arrow_interval = len(self.path) // (N*N-1) # Change 5 to adjust the arrow density
+        #print('arrow_interval: {:}  len(self.path) {:}  N*N {:}'.format(arrow_interval, len(self.path), N*N))
         arrow_positions = arrow_positions[:-1:arrow_interval]
         arrow_directions = arrow_directions[::arrow_interval]
 
         tr = self.path[0]
         startpt = plt.Circle((tr.p1.x,tr.p1.v),0.05,color='green')
-        ax = plt.gca()
         ax.add_patch(startpt)
 
         plt.quiver(
@@ -566,11 +583,13 @@ class path:
         )
 
 
-        cx, cy = self.compute_curves(idx)
-        plt.plot(cx,cy,color='blue')
+        cx, cy = self.compute_curves(-1) #compute trajectory path
+        ax.plot(cx,cy,color='blue')
         axlim = 2
         ax.set_xlim([-axlim,axlim])
         ax.set_ylim([-axlim,axlim])
+
+    def plotDone(self):
         plt.show()
 
 

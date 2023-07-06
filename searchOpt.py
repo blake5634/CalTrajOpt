@@ -33,8 +33,10 @@ def main(args):
     # is it a valid path?
     #p.check()
 
+    notes = '{:}, cost: {:4.2f} ({:})'.format(SEARCHT, cmin, cto.costtype)
+
     # graph the path
-    path2.plot(idx,SEARCHT)
+    path2.plot(idx,notes)
     #p.plot(idx)
 
 
