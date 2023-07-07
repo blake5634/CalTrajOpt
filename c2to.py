@@ -309,23 +309,21 @@ class path:
         self.searchtype = 'none yet'
         self.datafile = None
 
-    def search(self,searchtype,ns=1000):
+    def search(self,searchtype,dfile=None,nsamples=1000):
         if searchtype.startswith('heur'):
             p, cmin = self.heuristicSearch()
         elif searchtype.startswith('brute'):
-            p, cmin = self.bruteForce()
+            p, cmin = self.bruteForce(dfile=dfile)
         elif searchtype.startswith('sampling'):
-            p, cmin = self.sampleSearch(ns=ns)
+            p, cmin = self.sampleSearch(dfile=dfile,nsamples=nsamples)
         self.searchtype = searchtype
         return p,cmin
 
-    def sampleSearch(self,ns=1000):
-        return self.bruteForce(sampling=True,nsamples=ns)
+    def sampleSearch(self,dfile=None,nsamples=1000):
+        return self.bruteForce(dfile=dfile,sampling=True,nsamples=nsamples)
 
-    def bruteForce(self,sampling=False,nsamples=0): # path class
-        if sampling:
-            self.searchtype = 'sampling search'
-        elif self.searchtype == 'none yet':
+    def bruteForce(self,dfile=None,sampling=False,nsamples=0): # path class
+        if self.searchtype.startswith('none'):
             self.searchtype = 'brute force'
         n_all_paths = math.factorial(N*N)
         print('Starting {:} search: N={:}'.format(self.searchtype,N))
@@ -338,18 +336,19 @@ class path:
 
         SPEEDTEST = False  # just run 2000 paths to measure speed
 
-        STOREDATA = True   # write all perms and costs to a data file
+        if dfile is not None:
+            self.datafile = dfile
+            STOREDATA = True   # write all perms and costs to a data file
+        else:
+            STOREDATA = False
 
         if STOREDATA:
-            dfbf = bd.datafile('TSP_perms','BH','simulation')
-            self.datafile = dfbf
-            dataFolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS'
-            codeFolder = ''
-            dfbf.set_folders(dataFolder,codeFolder)
+            dfbf = dfile
             print('Saving permutations (paths) to: ',dfbf.name)
             itype = str(type(5))
             ftype = str(type(3.1415))
             tps = [itype]*(N*N)      # path point seq
+            tps.append(ftype) # the path cost's type
             names = []
             for i in range(N*N):
                 names.append('p{:}'.format(i))
@@ -358,6 +357,7 @@ class path:
             dfbf.metadata.d['Ncols'] = len(names)
             dfbf.metadata.d['Types'] = tps
             dfbf.metadata.d['Names'] = names
+            dfbf.metadata.d['Ncols'] = N*N+1
             dfbf.metadata.d['CostType'] = costtype
             dfbf.metadata.d['SearchType'] = self.searchtype
             dfbf.metadata.d['#samples'] = nsamples
@@ -374,8 +374,7 @@ class path:
             print('We are generating {:} random paths through {:} nodes'.format(nsamples,N*N))
             piter = []
             phashset = set()
-            nfound = 0
-            while nfound < nsamples:
+            for i in range(nsamples):
                 p = list(range(N*N))
                 random.shuffle(p)
                 pthash = 0
@@ -385,18 +384,23 @@ class path:
                 if pthash not in phashset: # we've found a new pt
                     piter.append(p)
                     phashset.add(pthash)
-                    nfound += 1
+
         print('Path enumeration complete:')
         secPerLoop = 0.0003366 # measured on IntelNUC
-        #secPerLoop = 0.0008419 # Dell XPS-13
-        print('   Estimated completion time: ',n_all_paths*secPerLoop,' sec.')
-        hrs = n_all_paths*secPerLoop/(60*60)
+        secPerLoop = 0.0008419 # Dell XPS-13
+        if sampling:
+            nvisited = nsamples
+        else:
+            nvisited = n_all_paths
+        sec = nvisited*secPerLoop
+        print('   Estimated completion time: ',sec,' sec.')
+        hrs = sec/(60*60)
         print('   Estimated completion time: ',hrs,' hrs.')
         days = hrs/24
         print('   Estimated completion time: ',days,' days.')
         months = 12*days/365
         print('   Estimated completion time: ',months,' months.')
-        years = months/12
+        years = days/365
         print('   Estimated completion time: ',years,' years.')
 
         x=input('ready?..')
@@ -590,12 +594,12 @@ class path:
 
     def plotSetup(self,note):
         if self.datafile is not None:
-            hashcode = self.datafile.name[11:17]
+            hashcode = self.datafile.hashcode
         else:
             hashcode = ''
         fig = plt.figure()
         plt.title('Path through Grid: minimize {:}  Amax = {:2.1f}\n            {:}'.format(costtype,AMAX,note))
-        plt.xlabel('X\n'+hashcode)
+        plt.xlabel('X     ('+hashcode+')')
         plt.ylabel('\dot{X}')
         plt.grid(True)
         return fig
