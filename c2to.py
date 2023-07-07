@@ -319,7 +319,7 @@ class path:
         self.searchtype = searchtype
         return p,cmin
 
-    def sampleSearch(self,dfile=None,nsamples=1000):
+    def sampleSearch(self,dfile=None,nsamples=977):
         return self.bruteForce(dfile=dfile,sampling=True,nsamples=nsamples)
 
     def bruteForce(self,dfile=None,sampling=False,nsamples=0): # path class
@@ -409,6 +409,7 @@ class path:
         path_costs = []
         n = -1
         cmin = 99999999999
+        cmax = 0
         pmin = []
         if SPEEDTEST:
             Navg = 20000
@@ -445,6 +446,12 @@ class path:
                 row = p
                 row.append(c)
                 dfbf.write(row)
+            if c > cmax:
+                cmax = c
+                pmax = path(self.grid,self.Cm)
+                pmax.path = tmpPath
+                pmax.Tcost = c
+                nmax = n
             if c < cmin:
                 cmin = c
                 pmin = path(self.grid,self.Cm)
@@ -465,23 +472,24 @@ class path:
             print('quantiling the costs')
             q = [0.25,0.5,0.75,1.0]
             qs = np.quantile(path_costs, q )
-            minCost= np.min(path_costs)
-            maxCost= np.max(path_costs)
             print('Quartile Report:')
-            print('  Min:        {:4.1f}'.format( minCost))
+            print('  Min:        {:4.1f}'.format( cmin))
             print('    Q1: {:4.2f}  {:4.1f}'.format( q[0], qs[0]))
             print('    Q2: {:4.2f}  {:4.1f}'.format( q[1], qs[1]))
             print('    Q3: {:4.2f}  {:4.1f}'.format( q[2], qs[2]))
             print('    Q4: {:4.2f}  {:4.1f}'.format( q[3], qs[3]))
-            print('  Max:        {:4.1f}'.format( maxCost ))
+            print('  Max:        {:4.1f}'.format( cmax ))
         else: # not enough memory for quartiles(!)
-            print('Lowest cost path: ', p)
-            print(pmin, 'path cost: ', cmin)
+            print('Lowest cost path: ', pmin)
+            print('path cost: ', cmin)
+            print('Highest cost path: ', pmax)
+            print('path cost: ', cmax)
 
         if STOREDATA:
-            dfbf.metadata.d['Min Cost']=minCost
-            dfbf.metadata.d['Max Cost']=maxCost
-            dfbf.metadata.d['Quartiles']=list(qs)
+            dfbf.metadata.d['Min Cost']=cmin
+            dfbf.metadata.d['Max Cost']=cmax
+            if not LOWMEM:
+                dfbf.metadata.d['Quartiles']=list(qs)
             dfbf.close()
         pmin.datafile = self.datafile
         return pmin, pmin.Tcost

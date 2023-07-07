@@ -29,7 +29,7 @@ def main(args):
     p = cto.path(gt,c1)
 
     #df = None  # no data file output
-    df = bd.datafile('path search results','BH','simulation')
+    df = bd.datafile('path_search_results','BH','simulation')
     dataFolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS'
     codeFolder = ''
     df.set_folders(dataFolder,codeFolder) # also creates filename
@@ -38,7 +38,7 @@ def main(args):
         df.metadata.d['ResearchQuestion'] = input('Enter research question:')
     #  cto.point2D.search() will take care of metatada setup
 
-    path2, cmin = p.search(SEARCHT, dfile=df, nsamples=50000)
+    path2, cmin = p.search(SEARCHT, dfile=df, nsamples=10000)
 
     # is it a valid path?
     #p.check()
