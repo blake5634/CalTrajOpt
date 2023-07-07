@@ -13,7 +13,8 @@ def main(args):
 
     # create a path and plot it graphically
     cto.configure()
-    idx = int(args[1])
+    #idx = int(args[1])
+    idx = -1
 
     # create grid
     gt = cto.grid2D(cto.N)
@@ -26,7 +27,7 @@ def main(args):
     # compute a path:
     p = cto.path(gt,c1)
 
-    path2, cmin = p.search(SEARCHT, ns=50000)
+    path2, cmin = p.search(SEARCHT, ns=1000)
 
     # is it a valid path?
     #p.check()

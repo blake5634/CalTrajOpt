@@ -307,6 +307,7 @@ class path:
         self.Tcost = 0.0
         self.path = []
         self.searchtype = 'none yet'
+        self.datafile = None
 
     def search(self,searchtype,ns=1000):
         if searchtype.startswith('heur'):
@@ -314,20 +315,22 @@ class path:
         elif searchtype.startswith('brute'):
             p, cmin = self.bruteForce()
         elif searchtype.startswith('sampling'):
-            p, cmin = self.sampleSearch(ns=50000)
+            p, cmin = self.sampleSearch(ns=ns)
         self.searchtype = searchtype
         return p,cmin
 
     def sampleSearch(self,ns=1000):
-        return self.bruteForce(sampling=True,n=ns)
+        return self.bruteForce(sampling=True,nsamples=ns)
 
-    def bruteForce(self,sampling=False,n=0): # path class
-        if self.searchtype.startswith('none'):
+    def bruteForce(self,sampling=False,nsamples=0): # path class
+        if sampling:
+            self.searchtype = 'sampling search'
+        elif self.searchtype == 'none yet':
             self.searchtype = 'brute force'
         n_all_paths = math.factorial(N*N)
         print('Starting {:} search: N={:}'.format(self.searchtype,N))
         if sampling:
-            print('   Sampling {:} paths out of {:12.5e}'.format(n,float(n_all_paths)))
+            print('   Sampling {:} paths out of {:12.5e}'.format(nsamples,float(n_all_paths)))
 
         LOWMEM = False
         if N>3:
@@ -339,6 +342,7 @@ class path:
 
         if STOREDATA:
             dfbf = bd.datafile('TSP_perms','BH','simulation')
+            self.datafile = dfbf
             dataFolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS'
             codeFolder = ''
             dfbf.set_folders(dataFolder,codeFolder)
@@ -346,14 +350,17 @@ class path:
             itype = str(type(5))
             ftype = str(type(3.1415))
             tps = [itype]*(N*N)      # path point seq
-            names = [' ']*(N*N)
-            tps.append(ftype) # the path cost's type
+            names = []
+            for i in range(N*N):
+                names.append('p{:}'.format(i))
             names.append('Cost')
+            tps.append(ftype) # the path cost's type
+            dfbf.metadata.d['Ncols'] = len(names)
             dfbf.metadata.d['Types'] = tps
             dfbf.metadata.d['Names'] = names
             dfbf.metadata.d['CostType'] = costtype
             dfbf.metadata.d['SearchType'] = self.searchtype
-            dfbf.metadata.d['#samples'] = n
+            dfbf.metadata.d['#samples'] = nsamples
 
             #
             dfbf.open()  # let's open the file (default is for writing)
@@ -364,24 +371,24 @@ class path:
             x=input('ready?..')
             piter = itt.permutations(range(N*N),N*N) # not a list!
         else:
-            print('We are generating {:} random paths through {:} nodes'.format(n,N*N))
-            m = N*N
+            print('We are generating {:} random paths through {:} nodes'.format(nsamples,N*N))
             piter = []
-            phashlist = []
-            for i in range(n):
+            phashset = set()
+            nfound = 0
+            while nfound < nsamples:
                 p = list(range(N*N))
                 random.shuffle(p)
                 pthash = 0
                 for j in p:
                     pthash += j
                     pthash *= N*N
-                if pthash not in phashlist: # we've found a new pt
+                if pthash not in phashset: # we've found a new pt
                     piter.append(p)
-                    phashlist.append(pthash)
-
+                    phashset.add(pthash)
+                    nfound += 1
         print('Path enumeration complete:')
         secPerLoop = 0.0003366 # measured on IntelNUC
-        secPerLoop = 0.0008419 # Dell XPS-13
+        #secPerLoop = 0.0008419 # Dell XPS-13
         print('   Estimated completion time: ',n_all_paths*secPerLoop,' sec.')
         hrs = n_all_paths*secPerLoop/(60*60)
         print('   Estimated completion time: ',hrs,' hrs.')
@@ -472,6 +479,7 @@ class path:
             dfbf.metadata.d['Max Cost']=maxCost
             dfbf.metadata.d['Quartiles']=list(qs)
             dfbf.close()
+        pmin.datafile = self.datafile
         return pmin, pmin.Tcost
 
     def heuristicSearch(self):  # path class
@@ -581,9 +589,13 @@ class path:
         self.plotDone()
 
     def plotSetup(self,note):
+        if self.datafile is not None:
+            hashcode = self.datafile.name[11:17]
+        else:
+            hashcode = ''
         fig = plt.figure()
-        plt.title('Path through Grid: minimize {:}  Amax = {:2.1f}\n            {:} '.format(costtype,AMAX,note))
-        plt.xlabel('X')
+        plt.title('Path through Grid: minimize {:}  Amax = {:2.1f}\n            {:}'.format(costtype,AMAX,note))
+        plt.xlabel('X\n'+hashcode)
         plt.ylabel('\dot{X}')
         plt.grid(True)
         return fig
