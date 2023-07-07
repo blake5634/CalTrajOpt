@@ -308,26 +308,26 @@ class path:
         self.path = []
         self.searchtype = 'none yet'
 
-    def search(self,searchtype,ns=1000):
+    def search(self,searchtype,dfile=None,ns=1000):
         if searchtype.startswith('heur'):
             p, cmin = self.heuristicSearch()
         elif searchtype.startswith('brute'):
-            p, cmin = self.bruteForce()
+            p, cmin = self.bruteForce(dfile=dfile)
         elif searchtype.startswith('sampling'):
-            p, cmin = self.sampleSearch(ns=50000)
+            p, cmin = self.sampleSearch(dfile=dfile,ns=ns)
         self.searchtype = searchtype
         return p,cmin
 
-    def sampleSearch(self,ns=1000):
-        return self.bruteForce(sampling=True,n=ns)
+    def sampleSearch(self,dfile=None,ns=1000):
+        return self.bruteForce(dfile=dfile,sampling=True,ns=ns)
 
-    def bruteForce(self,sampling=False,n=0): # path class
+    def bruteForce(self,dfile=None,sampling=False,ns=0): # path class
         if self.searchtype.startswith('none'):
             self.searchtype = 'brute force'
         n_all_paths = math.factorial(N*N)
         print('Starting {:} search: N={:}'.format(self.searchtype,N))
         if sampling:
-            print('   Sampling {:} paths out of {:12.5e}'.format(n,float(n_all_paths)))
+            print('   Sampling {:} paths out of {:12.5e}'.format(ns,float(n_all_paths)))
 
         LOWMEM = False
         if N>3:
@@ -335,25 +335,28 @@ class path:
 
         SPEEDTEST = False  # just run 2000 paths to measure speed
 
-        STOREDATA = True   # write all perms and costs to a data file
+        if dfile is not None:
+            STOREDATA = True   # write all perms and costs to a data file
+        else:
+            STOREDATA = False
 
         if STOREDATA:
-            dfbf = bd.datafile('TSP_perms','BH','simulation')
-            dataFolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS'
-            codeFolder = ''
-            dfbf.set_folders(dataFolder,codeFolder)
+            dfbf = dfile
             print('Saving permutations (paths) to: ',dfbf.name)
             itype = str(type(5))
             ftype = str(type(3.1415))
             tps = [itype]*(N*N)      # path point seq
-            names = [' ']*(N*N)
             tps.append(ftype) # the path cost's type
+            names = []
+            for i in range(N*N):
+                names.append('p{:}'.format(i))
             names.append('Cost')
             dfbf.metadata.d['Types'] = tps
             dfbf.metadata.d['Names'] = names
+            dfbf.metadata.d['Ncols'] = N*N+1
             dfbf.metadata.d['CostType'] = costtype
             dfbf.metadata.d['SearchType'] = self.searchtype
-            dfbf.metadata.d['#samples'] = n
+            dfbf.metadata.d['#samples'] = ns
 
             #
             dfbf.open()  # let's open the file (default is for writing)
@@ -364,32 +367,36 @@ class path:
             x=input('ready?..')
             piter = itt.permutations(range(N*N),N*N) # not a list!
         else:
-            print('We are generating {:} random paths through {:} nodes'.format(n,N*N))
-            m = N*N
+            print('We are generating {:} random paths through {:} nodes'.format(ns,N*N))
             piter = []
-            phashlist = []
-            for i in range(n):
+            phashset = set()
+            for i in range(ns):
                 p = list(range(N*N))
                 random.shuffle(p)
                 pthash = 0
                 for j in p:
                     pthash += j
                     pthash *= N*N
-                if pthash not in phashlist: # we've found a new pt
+                if pthash not in phashset: # we've found a new pt
                     piter.append(p)
-                    phashlist.append(pthash)
+                    phashset.add(pthash)
 
         print('Path enumeration complete:')
         secPerLoop = 0.0003366 # measured on IntelNUC
         secPerLoop = 0.0008419 # Dell XPS-13
-        print('   Estimated completion time: ',n_all_paths*secPerLoop,' sec.')
-        hrs = n_all_paths*secPerLoop/(60*60)
+        if sampling:
+            nvisited = ns
+        else:
+            nvisited = n_all_paths
+        sec = nvisited*secPerLoop
+        print('   Estimated completion time: ',sec,' sec.')
+        hrs = sec/(60*60)
         print('   Estimated completion time: ',hrs,' hrs.')
         days = hrs/24
         print('   Estimated completion time: ',days,' days.')
         months = 12*days/365
         print('   Estimated completion time: ',months,' months.')
-        years = months/12
+        years = days/365
         print('   Estimated completion time: ',years,' years.')
 
         x=input('ready?..')
