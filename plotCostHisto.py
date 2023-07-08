@@ -33,7 +33,7 @@ def main(args):
     dfname = None
     for f in csvfiles:
         if hashstr in f:
-            dfname = f
+            dfname = f    # our desired file name
     if not dfname:
         bd.brl_error('Somethings wrong with hash string (not found)')
 
@@ -43,6 +43,8 @@ def main(args):
 
     print('opening ', dfname)
     df = bd.datafile('', '','')  # open it with blank title info
+    df.hashcode = dfname.split('_')[1]  # replace the newly generated hash code with the file of interest
+    print('Our hashcode is: ',df.hashcode)
     df.set_folders(datadir,'')        # set these to wherever you want to open datafiles
     df.open('r',tname=datadir+'/'+dfname)
     df.metadata.polish()  # convert metadata from strings to useful types
@@ -50,8 +52,15 @@ def main(args):
     x = df.metadata.d['CostHistogram_levels'][1:]
     y = df.metadata.d['CostHistogram_values']
     npts = sum(y)
-    mu,sd = 17.86, 2.34
+    mu = df.metadata.d['CostMean']
+    sd = df.metadata.d['CostStDev']
+    ct = df.metadata.d['CostType']
+    hc = df.hashcode
+
     plt.bar(x,y,width=0.5,color='b')
+    plt.title('{:} cost distribution, n={:} samples'.format(ct,npts))
+    plt.xlabel('Cost      ({:})'.format(hc))
+    plt.ylabel('# paths')
     curve = norm.pdf(x,mu,sd)
     scale = npts
     for i in range(len(curve)):

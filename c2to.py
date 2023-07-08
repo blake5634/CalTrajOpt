@@ -310,13 +310,13 @@ class path:
         self.datafile = None
 
     def search(self,searchtype,dfile=None,nsamples=1000):
+        self.searchtype = searchtype
         if searchtype.startswith('heur'):
             p, cmin = self.heuristicSearch()
         elif searchtype.startswith('brute'):
             p, cmin = self.bruteForce(dfile=dfile)
         elif searchtype.startswith('sampling'):
             p, cmin = self.sampleSearch(dfile=dfile,nsamples=nsamples)
-        self.searchtype = searchtype
         return p,cmin
 
     def sampleSearch(self,dfile=None,nsamples=977):

@@ -92,6 +92,7 @@ def main(args):
             print('{:3d} {:5.2f} - {:5.2f} | {:}'.format(i,fullims[i-1],fullims[i],b))
     df.metadata.d['CostHistogram_values'] = bins
     df.metadata.d['CostHistogram_levels'] = list(fullims)
+    df.metadata.save()
     df.close()
 
     if True:  #CSV version
