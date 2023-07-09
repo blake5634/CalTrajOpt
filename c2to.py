@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+import os
+import json
 import numpy as np
 import math
 import matplotlib.pyplot as plt
@@ -12,6 +14,11 @@ def error(msg):
     print('Error: ')
     print(msg)
     quit()
+
+PCNAME = 'XPS-13'
+PCNAME = 'XPS-15'
+PCNAME = 'beagle'
+PCNAME = 'IntelNUC'
 
 N = 4
 
@@ -67,6 +74,16 @@ def idx2ij(idx):
     j = idx-N*i
     return i,j
 
+def save_timing(searchname,pc,rate):
+    if os.path.isfile('searchTiming.json'):
+        fd = open('searchTiming.json','r')
+        d = json.load(fd)
+    else:
+        d = {}
+    d[searchname+pc] = rate
+    fd = open('searchTiming.json','w')
+    json.dump(d,fd,indent=4)
+    return
 
 class grid2D:
     def __init__(self, N):
@@ -302,21 +319,68 @@ class path:
         self.sr = startrow
         self.sc = startcol
         self.mark = [True for x in range(N*N)]
-        count = 0
         self.mark[self.sr*N+self.sc] = False # mark our starting point
         self.Tcost = 0.0
-        self.path = []
+        self.path = []  # the path as a list of trajectories
+        self.idxpath = [] # the path as a list of indeces (0..N*N)
         self.searchtype = 'none yet'
         self.datafile = None
 
     def search(self,searchtype,dfile=None,nsamples=1000):
         self.searchtype = searchtype
+        #
+        # predict the search timing
+        #
+        if os.path.isfile('searchTiming.json'):
+            key = searchtype+PCNAME
+            fd = open('searchTiming.json','r')
+            d = json.load(fd)
+            if key in d.keys():
+                print('your predicted search time is:')
+                print('n samples:',nsamples)
+                print('search type/PC:',key)
+                print('rate:          ',d[key],'/sec')
+                sec = float(d[key])*nsamples
+                mins = sec/60
+                hrs = mins/60
+                days = hrs/24
+                years = days/365
+                print('predicted time: ')
+                print('{:12.2f} mins'.format(mins))
+                print('{:12.2f} hrs'.format(hrs))
+                print('{:12.2f} days'.format(days))
+                print('{:12.2f} years'.format(years))
+        else:
+            print('no search speed info available for your configuration')
+
+        #
+        #  start timer
+        ts1 = datetime.datetime.now()
+        #
+        #  select the type of search to do
+        #
         if searchtype.startswith('heur'):
-            p, cmin = self.heuristicSearch()
+            p, cmin = self.heuristicSearch(dfine,)
+        elif searchtype.startswith('multi'):
+            if dfile is None:
+                error('path.search: multi heuristic search requires a dfile')
+            p, cmin = self.multiHSearch(dfile,nsamples)
         elif searchtype.startswith('brute'):
+            if dfile is None:
+                error('path.search: brute force search requires a dfile')
             p, cmin = self.bruteForce(dfile=dfile)
         elif searchtype.startswith('sampling'):
+            if dfile is None:
+                error('path.search: sampling search requires a dfile')
             p, cmin = self.sampleSearch(dfile=dfile,nsamples=nsamples)
+        else:
+            error('path.search: unknown search type: ', searchtype)
+        #report timing
+        ts2 = datetime.datetime.now()
+        dt = (ts2-ts1).total_seconds()
+        print('seconds per {:} paths: {:}'.format(nsamples, float(dt)))
+        print('seconds per path: {:}'.format(float(dt)/nsamples))
+        save_timing(searchtype,PCNAME,float(dt)/nsamples)
         return p,cmin
 
     def sampleSearch(self,dfile=None,nsamples=977):
@@ -414,19 +478,17 @@ class path:
         if SPEEDTEST:
             Navg = 20000
             ts1 = datetime.datetime.now()
-        for p in piter:  # piter returns set of points
-            p = list(p)
+        for p in piter:  # piter returns list of point indeces
+            idxpath = list(p)
             n += 1
             #print('path: ',n, p)
             c = 0.0
             tmpPath = []
-            for i in range(len(p)-1):
+            for i in range(len(idxpath)-1):
                 # build next trajectory
-                row = p[i]//N
-                col = p[i]-row*N
+                row,col = idx2ij(p[i])
                 p1 = point2D(row,col)
-                row = p[i+1]//N
-                col = p[i+1]-row*N
+                row,col = idx2ij(p[i+1])
                 p2 = point2D(row,col)
                 tr = trajectory2D(p1,p2)
                 tr.constrain_A()
@@ -443,7 +505,7 @@ class path:
             if n%2000 == 0:
                     print('path ',n)
             if STOREDATA:
-                row = p
+                row = idxpath # list of int index pts
                 row.append(c)
                 dfbf.write(row)
             if c > cmax:
@@ -467,6 +529,7 @@ class path:
             dt = (ts2-ts1).total_seconds()
             print('seconds per {:} paths: {:}'.format(Navg, float(dt)))
             print('seconds per path: {:}'.format(float(dt)/Navg))
+            save_timing(self.searchtype,PCNAME, float(dt)/Navg)
             quit()
         if not LOWMEM:
             print('quantiling the costs')
@@ -492,19 +555,90 @@ class path:
                 dfbf.metadata.d['Quartiles']=list(qs)
             dfbf.close()
         pmin.datafile = self.datafile
+        #return path object, float
         return pmin, pmin.Tcost
+
+    def multiHSearch(self,dfile,nsearch):
+        ts1 = datetime.datetime.now()
+        df = dfile
+        print('Saving permutations (paths) to: ',df.name)
+        itype = str(type(5))
+        ftype = str(type(3.1415))
+        tps = [itype]*(N*N)      # path point seq
+        tps.append(ftype) # the path cost's type
+        names = []
+        for i in range(N*N):
+            names.append('p{:}'.format(i))
+        names.append('Cost')
+        tps.append(ftype) # the path cost's type
+        df.metadata.d['Ncols'] = len(names)
+        df.metadata.d['Types'] = tps
+        df.metadata.d['Names'] = names
+        df.metadata.d['Ncols'] = N*N+1
+        df.metadata.d['CostType'] = costtype
+        df.metadata.d['SearchType'] = self.searchtype
+        df.metadata.d['#samples'] = nsearch
+
+        #
+        df.open()  # let's open the file (default is for writing)
+
+        # perform and save nsearch heuristic searches
+        # from different starting points
+        pmin = None
+        pmax = None
+        cmin = 99999999999
+        cmax = 0
+        for i in range(nsearch):
+            if i%2000==0:
+                print('multiple heuristic searches: ',i)
+            # change start point each time
+            self.sr = random.randint(0,N-1)
+            self.sc = random.randint(0,N-1)
+            # reset search info
+            self.mark = [True for x in range(N*N)]
+            count = 0
+            self.mark[self.sr*N+self.sc] = False # mark our starting point
+            self.Tcost = 0.0
+            pself,c = self.heuristicSearch()
+            datarow = pself.idxpath
+            #print('my path: ',datarow)
+            datarow.append(c) # last col is cost
+            df.write(datarow)
+            if c < cmin: # find lowest cost of the runs
+                cmin=c
+                pmin = path(self.grid,self.Cm)
+                pmin.path = pself.path
+                pmin.Tcost = c
+            if c > cmax: # find highest cost
+                cmax = c
+                pmax = path(self.grid,self.Cm)
+                pmax.path = self.path
+                pmax.Tcost = c
+        df.metadata.d['Min Cost']=cmin
+        df.metadata.d['Max Cost']=cmax
+        print('Lowest cost path: ', pmin)
+        print('path cost: ', cmin)
+        print('Highest cost path: ', pmax)
+        print('path cost: ', cmax)
+        df.close()
+        self.datafile = df
+        # return path object, float
+        return pmin,pmin.Tcost
 
     def heuristicSearch(self):  # path class
         # add to self.path[] one traj at a time greedily
         crow = self.sr*N + self.sc  # starting point in cost matrix
         firstrow = self.sr*N + self.sc
+        self.idxpath = []  # list if index points
+        self.path = [] # list of trajectories
         while len(self.path) < N*N-1: # build path up one pt at a time
-            print('looking for next path pt: row: ',crow)
+            #print('looking for next path pt: row: ',crow)
             cmin = 99999999
             cminidx = 0
             found = False
-            for ccol in range(N*N):
+            for ccol in range(N*N):  # ccol is an index
                 if self.mark[ccol]:
+                    # look at all branches leaving current pt
                     if self.Cm.m[crow][ccol].valid:  # first attempt: pick first min cost traj.
                                                            # and elim self transitions
                         x,v,a,t = self.Cm.m[crow][ccol].timeEvolution()
@@ -527,7 +661,7 @@ class path:
             self.mark[cminidx] = False  # do not visit this point again
             if not self.Cm.m[crow][cminidx].valid:
                 print('crow', crow, 'ccol: ', ccol)
-                error('path: invalid new point')
+                error('path: invalid new trajectory')
             t = self.Cm.m[crow][cminidx]  # get current best trajectory
             if crow != firstrow:  # no trajectory has t.p2=startPoint
                 pprev = self.path[-1].p2
@@ -537,10 +671,19 @@ class path:
                     print('adding traj: ', t)
                     error('path trajectories dont connect! '+str(crow))
             self.path.append(t)
-            print('              adding traj to path: ', self.path[-1])
+            # also keep the path as list of indeces
+            pathptidx = ij2idx(t.p1.row,t.p1.col)
+            self.idxpath.append(pathptidx)
+            #print('    adding traj to path: ', self.path[-1])
             crow = cminidx
             self.Tcost += cmin
-            print('Total path cost ({:}) = {:8.2f}: '.format(costtype,self.Tcost))
+            #print('Total path cost ({:}) = {:8.2f}: '.format(costtype,self.Tcost))
+
+        t = self.path[-1]
+        # don't forget the last point in the path
+        pathendpt = ij2idx(t.p2.row,t.p2.col)
+        self.idxpath.append(pathendpt)
+        #return path object, float
         return self, self.Tcost
 
     def check(self):
@@ -613,8 +756,8 @@ class path:
         return fig
 
     def plotOnePath(self,fig):
-        x_values = [point.p1.x for point in self.path]  # starting values
-        y_values = [point.p1.v for point in self.path]
+        x_values = [traj.p1.x for traj in self.path]  # starting values
+        y_values = [traj.p1.v for traj in self.path]
         x_values.append(self.path[-1].p2.x)
         y_values.append(self.path[-1].p2.v)
         ax = plt.gca()

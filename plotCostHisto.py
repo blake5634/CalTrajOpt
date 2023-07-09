@@ -5,6 +5,7 @@
 import os
 import c2to as cto
 import sys
+import numpy as np
 import statistics as stats
 from scipy.stats import norm
 import brl_data.brl_data as bd
@@ -49,7 +50,10 @@ def main(args):
     df.open('r',tname=datadir+'/'+dfname)
     df.metadata.polish()  # convert metadata from strings to useful types
 
-    x = df.metadata.d['CostHistogram_levels'][1:]
+    try:
+        x = df.metadata.d['CostHistogram_levels'][1:]
+    except:
+        cto.error('Please run getCostHisto in this data first')
     y = df.metadata.d['CostHistogram_values']
     npts = sum(y)
     mu = df.metadata.d['CostMean']
@@ -62,9 +66,15 @@ def main(args):
     plt.xlabel('Cost      ({:})'.format(hc))
     plt.ylabel('# paths')
     curve = norm.pdf(x,mu,sd)
-    scale = npts
+    #c2 = norm.pdf(x,18.2,sd)
+    txtx = mu+1.3*sd
+    txty = max(y)*0.8
+    plt.text(txtx,txty,'mu: {:4.2f} sd: {:4.2f}'.format(mu,sd))
+    # chatGPT: max_value / (1 / (σ * sqrt(2π))).
+    scale = max(y)/max(curve)
     for i in range(len(curve)):
         curve[i] *= scale
+        #c2[i] *= scale
     plt.plot(x,curve)
     plt.show()
 

@@ -9,8 +9,9 @@ import brl_data.brl_data as bd
 
 def main(args):
     #SEARCHT = 'heuristic search'
-    #SEARCHT = 'brute force'
-    SEARCHT = 'sampling search'
+    SEARCHT = 'brute force'
+    #SEARCHT = 'sampling search'
+    SEARCHT = 'multi heuristic'
 
     # create a path and plot it graphically
     cto.configure()
@@ -38,7 +39,7 @@ def main(args):
         df.metadata.d['ResearchQuestion'] = input('Enter research question:')
     #  cto.point2D.search() will take care of metatada setup
 
-    path2, cmin = p.search(SEARCHT, dfile=df, nsamples=1000000)
+    path2, cmin = p.search(SEARCHT, dfile=df, nsamples=10000)
 
     # is it a valid path?
     #p.check()
