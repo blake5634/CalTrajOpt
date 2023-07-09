@@ -39,19 +39,17 @@ def main(args):
         df.metadata.d['ResearchQuestion'] = input('Enter research question:')
     #  cto.point2D.search() will take care of metatada setup
 
-    path2, cmin = p.search(SEARCHT, dfile=df, nsamples=10000)
+    path2, cmin = p.search(SEARCHT, dfile=df, nsamples=1000)
 
     # is it a valid path?
     #p.check()
 
     notes = '{:}, cost: {:4.2f} ({:})'.format(SEARCHT, cmin, cto.costtype)
 
+    print('your data file hash is:',df.hashcode)
     # graph the path
     path2.plot(idx,notes)
     #p.plot(idx)
-
-
-
 
 
 if __name__ ==  '__main__':

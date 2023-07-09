@@ -134,6 +134,8 @@ class trajectory2D:
         #print('trajectory2D: p1,p2: ',p1,p2)
         self.p1 = p1
         self.p2 = p2
+        self.e_cost = None
+        self.t_cost = None
         self.computed = False
         self.constrained = False
         self.valid = True
@@ -201,7 +203,7 @@ class trajectory2D:
         self.compute(self.dt) # because we changed dt
         return dt
 
-    def timeEvolution(self):
+    def timeEvolution(self,ACC_ONLY=False):
         if not self.computed and not self.constrained:
             error('Cant compute timeEvolution until trajectory is computed and constrained')
         Np = 20
@@ -209,17 +211,24 @@ class trajectory2D:
         v = []
         a = []
         t = []
-        for t1 in range (Np):
-            t2 = self.dt*t1/Np
-            t.append(t2)
-            x.append(self.x(t2))
-            v.append(self.xd(t2))
-            a.append(self.xdd(t2))
-        t.append(self.dt)
-        x.append(self.x(self.dt))
-        v.append(self.xd(self.dt))
-        a.append(self.xdd(self.dt))
-        return t,x,v,a
+        if not ACC_ONLY:
+            for t1 in range (Np):
+                t2 = self.dt*t1/Np
+                t.append(t2)
+                x.append(self.x(t2))
+                v.append(self.xd(t2))
+                a.append(self.xdd(t2))
+            t.append(self.dt)
+            x.append(self.x(self.dt))
+            v.append(self.xd(self.dt))
+            a.append(self.xdd(self.dt))
+            return t,x,v,a
+        if ACC_ONLY:
+            for t1 in range (Np):
+                t2 = self.dt*t1/Np
+                a.append(self.xdd(t2))
+            a.append(self.xdd(self.dt))
+            return a
 
     #
     #   Energy cost: sum of squared acceleration
@@ -230,11 +239,13 @@ class trajectory2D:
         n = len(a)
         for a1 in a:
             c += self.dt*a1*a1/n
+        self.e_cost = c
         return c
 
     def cost_t(self):
         if not self.computed and not self.constrained:
             error('Cant compute cost_t until trajectory is computed and constrained')
+        self.e_cost = self.dt
         return self.dt
 
     def __repr__(self):
@@ -264,8 +275,12 @@ class Cm: # matrix full of trajectory2D objs
                         if (p1.x == p2.x and p1.v == p2.v):
                             t.valid = False  # eliminate self transitions
                         else:
-                            t.compute(DT_TEST)
-                            t.constrain_A()
+                            t.compute(DT_TEST) #get coeffs
+                            t.constrain_A()    #constrain for Amax
+                            a = t.timeEvolution(ACC_ONLY=True)
+                            t.e_cost = t.cost_e(a)
+                            t.t_cost = t.cost_t()
+
                         self.m[r][c] = t
         print('done with fill...')
 
@@ -633,52 +648,58 @@ class path:
         self.path = [] # list of trajectories
         while len(self.path) < N*N-1: # build path up one pt at a time
             #print('looking for next path pt: row: ',crow)
-            cmin = 99999999
-            cminidx = 0
-            found = False
+            br_next_tr = []   # next point by trajectory
+            br_costs = []  # cost of branch/traj to next point
+            # capture cost of all unmarked,valid branches out of this node
             for ccol in range(N*N):  # ccol is an index
                 if self.mark[ccol]:
                     # look at all branches leaving current pt
                     if self.Cm.m[crow][ccol].valid:  # first attempt: pick first min cost traj.
                                                            # and elim self transitions
-                        x,v,a,t = self.Cm.m[crow][ccol].timeEvolution()
                         if costtype == 'energy':
-                            ccost = self.Cm.m[crow][ccol].cost_e(a)
+                            ccost = self.Cm.m[crow][ccol].e_cost # now pre-computed
                         elif costtype == 'time':
-                            ccost = self.Cm.m[crow][ccol].cost_t()
+                            ccost = self.Cm.m[crow][ccol].t_cost
                         else:
                             error('unknown cost type: '+costtype)
                         #print('  cost:',ccost)
-                        if ccost < cmin:
-                            #print('newmin: ', ccost, ccol)
-                            cmin = ccost
-                            cminidx = ccol
-                            found = True
-            if not found:
-                error('I didnt find a minimum cost!!'+ str(count))
+                        br_next_tr.append(self.Cm.m[crow][ccol])
+                        br_costs.append(ccost)
+            # now we have to choose a random branch having min cost
+            if len(br_next_tr)==0:
+                error('somethings wrong: i cant find a next node!')
+            minCost = min(br_costs) # will be either a time or energy cost
+            epsilon = 0.02*minCost
+            tiebreakerlist = []
+            for i,t in enumerate(br_next_tr):
+                if costtype == 'energy' and abs(t.e_cost-minCost)<epsilon:
+                    tiebreakerlist.append(t)
+                if costtype == 'time' and abs(t.t_cost-minCost)<epsilon:
+                    tiebreakerlist.append(t)
+            print('tie: ',len(tiebreakerlist))
+            newtraj = random.choice(tiebreakerlist)
+            cminidx=ij2idx(newtraj.p2.row,newtraj.p2.col) # index of next point
             if not self.mark[cminidx]:
                 error('new path point is marked already')
             self.mark[cminidx] = False  # do not visit this point again
-            if not self.Cm.m[crow][cminidx].valid:
+            if not newtraj.valid:
                 print('crow', crow, 'ccol: ', ccol)
                 error('path: invalid new trajectory')
-            t = self.Cm.m[crow][cminidx]  # get current best trajectory
             if crow != firstrow:  # no trajectory has t.p2=startPoint
                 pprev = self.path[-1].p2
-                pcurr = t.p1
+                pcurr = newtraj.p1
                 if pprev != pcurr: # check for error
                     print('crow/firstrow: ', crow, firstrow)
                     print('adding traj: ', t)
                     error('path trajectories dont connect! '+str(crow))
-            self.path.append(t)
+            self.path.append(newtraj)
             # also keep the path as list of indeces
-            pathptidx = ij2idx(t.p1.row,t.p1.col)
+            pathptidx = ij2idx(newtraj.p1.row,newtraj.p1.col)
             self.idxpath.append(pathptidx)
             #print('    adding traj to path: ', self.path[-1])
             crow = cminidx
-            self.Tcost += cmin
+            self.Tcost += minCost
             #print('Total path cost ({:}) = {:8.2f}: '.format(costtype,self.Tcost))
-
         t = self.path[-1]
         # don't forget the last point in the path
         pathendpt = ij2idx(t.p2.row,t.p2.col)
