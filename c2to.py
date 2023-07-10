@@ -74,6 +74,33 @@ def idx2ij(idx):
     j = idx-N*i
     return i,j
 
+def predict_timing(nsamp):
+      #
+        # predict the search timing
+        #
+        if os.path.isfile('searchTiming.json'):
+            key = searchtype+PCNAME
+            fd = open('searchTiming.json','r')
+            d = json.load(fd)
+            print('n samples:',nsamples)
+            if key in d.keys():
+                print('your predicted search time is:')
+                print('search type/PC:',key)
+                print('rate:          ',d[key],'/sec')
+                sec = float(d[key])*nsamples
+                mins = sec/60
+                hrs = mins/60
+                days = hrs/24
+                years = days/365
+                print('predicted time: ')
+                fmth='{:10} {:12} {:12} {:12} {:12}'
+                print(fmth.format('PC type','mins','hrs','days','years')
+                fmts='{:10} {:12.2f} {:12.2f} {:12.2f} {:12.2f}'
+                if mins>2:
+                    x=input('OK to continue? ...')
+        else:
+            print('no search speed info available for your configuration')
+
 def save_timing(searchname,pc,rate):
     if os.path.isfile('searchTiming.json'):
         fd = open('searchTiming.json','r')
@@ -347,33 +374,8 @@ class path:
 
     def search(self,searchtype,dfile=None,nsamples=1000):
         self.searchtype = searchtype
-        #
-        # predict the search timing
-        #
-        if os.path.isfile('searchTiming.json'):
-            key = searchtype+PCNAME
-            fd = open('searchTiming.json','r')
-            d = json.load(fd)
-            if key in d.keys():
-                print('your predicted search time is:')
-                print('n samples:',nsamples)
-                print('search type/PC:',key)
-                print('rate:          ',d[key],'/sec')
-                sec = float(d[key])*nsamples
-                mins = sec/60
-                hrs = mins/60
-                days = hrs/24
-                years = days/365
-                print('predicted time: ')
-                print('{:12.2f} mins'.format(mins))
-                print('{:12.2f} hrs'.format(hrs))
-                print('{:12.2f} days'.format(days))
-                print('{:12.2f} years'.format(years))
-                if mins>2:
-                    x = input('Ok to continue? ...')
-        else:
-            print('no search speed info available for your configuration')
 
+        predict_timing(nsamples)
         #
         #  start timer
         ts1 = datetime.datetime.now()
@@ -471,8 +473,8 @@ class path:
                     phashset.add(pthash)
 
         print('Path enumeration complete:')
-        secPerLoop = 0.0003366 # measured on IntelNUC
-        secPerLoop = 0.0008419 # Dell XPS-13
+        #secPerLoop = 0.0003366 # measured on IntelNUC
+        #secPerLoop = 0.0008419 # Dell XPS-13
         if sampling:
             nvisited = nsamples
         else:
