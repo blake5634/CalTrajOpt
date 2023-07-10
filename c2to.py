@@ -245,7 +245,7 @@ class trajectory2D:
     def cost_t(self):
         if not self.computed and not self.constrained:
             error('Cant compute cost_t until trajectory is computed and constrained')
-        self.e_cost = self.dt
+        self.t_cost = self.dt
         return self.dt
 
     def __repr__(self):
@@ -278,8 +278,9 @@ class Cm: # matrix full of trajectory2D objs
                             t.compute(DT_TEST) #get coeffs
                             t.constrain_A()    #constrain for Amax
                             a = t.timeEvolution(ACC_ONLY=True)
-                            t.e_cost = t.cost_e(a)
-                            t.t_cost = t.cost_t()
+                            #compute traj costs
+                            t.cost_e(a)
+                            t.cost_t()
 
                         self.m[r][c] = t
         print('done with fill...')
@@ -652,31 +653,42 @@ class path:
             br_costs = []  # cost of branch/traj to next point
             # capture cost of all unmarked,valid branches out of this node
             for ccol in range(N*N):  # ccol is an index
-                if self.mark[ccol]:
-                    # look at all branches leaving current pt
-                    if self.Cm.m[crow][ccol].valid:  # first attempt: pick first min cost traj.
-                                                           # and elim self transitions
+                if self.mark[ccol]:  # only unvisited
+                    # look at all unvisited branches leaving current pt
+                    ctraj = self.Cm.m[crow][ccol]
+                    if ctraj.valid: # don't do self transitions
                         if costtype == 'energy':
-                            ccost = self.Cm.m[crow][ccol].e_cost # now pre-computed
+                            ccost = ctraj.e_cost # now pre-computed
                         elif costtype == 'time':
-                            ccost = self.Cm.m[crow][ccol].t_cost
+                            ccost = ctraj.t_cost
                         else:
                             error('unknown cost type: '+costtype)
                         #print('  cost:',ccost)
-                        br_next_tr.append(self.Cm.m[crow][ccol])
+                        br_next_tr.append(ctraj) # collect all branches out
                         br_costs.append(ccost)
             # now we have to choose a random branch having min cost
             if len(br_next_tr)==0:
                 error('somethings wrong: i cant find a next node!')
             minCost = min(br_costs) # will be either a time or energy cost
-            epsilon = 0.02*minCost
+            epsilon = 0.25*minCost  # within 2% is a tie
             tiebreakerlist = []
-            for i,t in enumerate(br_next_tr):
-                if costtype == 'energy' and abs(t.e_cost-minCost)<epsilon:
+            for i,t in enumerate(br_next_tr): # go through all traj's
+                if abs(br_costs[i]-minCost)<epsilon: # if it's close to min
                     tiebreakerlist.append(t)
-                if costtype == 'time' and abs(t.t_cost-minCost)<epsilon:
-                    tiebreakerlist.append(t)
-            print('tie: ',len(tiebreakerlist))
+            if len(tiebreakerlist)>1:
+                print('tie: ',len(tiebreakerlist), tiebreakerlist)
+                print(' minCost: ', minCost, 'epsil:', epsilon)
+                stoppt = 7
+                #if len(self.idxpath) == stoppt: # debug in middle
+                if True:
+                    print('current next traj list: ',len(br_next_tr),'entries')
+                    #print(br_next_tr)
+                    print('current cost list:')
+                    print(sorted(br_costs))
+                    print('minCost:', minCost)
+                    x = input('?...')
+                    print('\n\n')
+            # pick a random entry from the ties
             newtraj = random.choice(tiebreakerlist)
             cminidx=ij2idx(newtraj.p2.row,newtraj.p2.col) # index of next point
             if not self.mark[cminidx]:
