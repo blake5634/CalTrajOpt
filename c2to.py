@@ -9,17 +9,15 @@ import itertools as itt
 import datetime
 import brl_data.brl_data as bd
 import random
+import socket
+
 
 def error(msg):
     print('Error: ')
     print(msg)
     quit()
 
-#PCNAME = 'XPS-13'
-PCNAME = 'XPS-15'
-#PCNAME = 'beagle'
-#PCNAME = 'IntelNUC'
-
+PCNAME = socket.gethostbyname()
 N = 4
 
 AMAX = 2  #  normalize for now.
@@ -78,27 +76,35 @@ def predict_timing(nsamp):
       #
         # predict the search timing
         #
+        OK = True
         if os.path.isfile('searchTiming.json'):
             key = searchtype+PCNAME
             fd = open('searchTiming.json','r')
             d = json.load(fd)
             print('n samples:',nsamples)
-            if key in d.keys():
-                print('your predicted search time is:')
-                print('search type/PC:',key)
-                print('rate:          ',d[key],'/sec')
-                sec = float(d[key])*nsamples
-                mins = sec/60
-                hrs = mins/60
-                days = hrs/24
-                years = days/365
-                print('predicted time: ')
-                fmth='{:10} {:12} {:12} {:12} {:12}'
-                print(fmth.format('PC type','mins','hrs','days','years')
-                fmts='{:10} {:12.2f} {:12.2f} {:12.2f} {:12.2f}'
-                if mins>2:
-                    x=input('OK to continue? ...')
+            key = PCNAME
+            try:
+                t = d[key]
+            except:
+                OK=False
+                break
+            print('your predicted search time is:')
+            print('search type/PC:',key)
+            print('rate:          ',d[key],'/sec')
+            sec = float(d[key])*nsamples
+            mins = sec/60
+            hrs = mins/60
+            days = hrs/24
+            years = days/365
+            print('predicted time: ')
+            fmth='{:10} {:12} {:12} {:12} {:12}'
+            print(fmth.format('PC type','mins','hrs','days','years')
+            fmts='{:10} {:12.2f} {:12.2f} {:12.2f} {:12.2f}'
+            if mins>2:
+                x=input('OK to continue? ...')
         else:
+            OK=False
+        if not OK:
             print('no search speed info available for your configuration')
 
 def save_timing(searchname,pc,rate):
@@ -419,9 +425,7 @@ class path:
 
         LOWMEM = False
         if N>3:
-            LOWMEM = True
-
-        SPEEDTEST = False  # just run 2000 paths to measure speed
+            LOWMEM = True  # we just can't store that many paths
 
         if dfile is not None:
             self.datafile = dfile
@@ -463,34 +467,19 @@ class path:
             phashset = set()
             for i in range(nsamples):
                 p = list(range(N*N))
-                random.shuffle(p)
-                pthash = 0
+                random.shuffle(p) # generate a path as random list of indices
+                pthash = ''
                 for j in p:
-                    pthash += j
-                    pthash *= N*N
+                    pthash += +='{:3d}'.format(j) # 'hash' the list
                 if pthash not in phashset: # we've found a new pt
                     piter.append(p)
                     phashset.add(pthash)
 
         print('Path enumeration complete:')
+
+        # keep around for history
         #secPerLoop = 0.0003366 # measured on IntelNUC
         #secPerLoop = 0.0008419 # Dell XPS-13
-        if sampling:
-            nvisited = nsamples
-        else:
-            nvisited = n_all_paths
-        sec = nvisited*secPerLoop
-        print('   Estimated completion time: ',sec,' sec.')
-        hrs = sec/(60*60)
-        print('   Estimated completion time: ',hrs,' hrs.')
-        days = hrs/24
-        print('   Estimated completion time: ',days,' days.')
-        months = 12*days/365
-        print('   Estimated completion time: ',months,' months.')
-        years = days/365
-        print('   Estimated completion time: ',years,' years.')
-
-        x=input('ready?..')
 
         #2) evaluate their costs
         path_costs = []
@@ -498,15 +487,11 @@ class path:
         cmin = 99999999999
         cmax = 0
         pmin = []
-        if SPEEDTEST:
-            Navg = 20000
-            ts1 = datetime.datetime.now()
-        for p in piter:  # piter returns list of point indeces
+        for p in piter:  # piter returns list of point indices
             idxpath = list(p)
             n += 1
-            #print('path: ',n, p)
-            c = 0.0
-            tmpPath = []
+            c = 0.0 #accumulate cost along path
+            tmpTrajList = []
             for i in range(len(idxpath)-1):
                 # build next trajectory
                 row,col = idx2ij(p[i])
@@ -515,7 +500,7 @@ class path:
                 p2 = point2D(row,col)
                 tr = trajectory2D(p1,p2)
                 tr.constrain_A()
-                tmpPath.append(tr)
+                tmpTrajList.append(tr)
                 if costtype == 'energy':
                     a = tr.timeEvolution(ACC_ONLY=True)
                     c += tr.cost_e(a)
@@ -523,10 +508,8 @@ class path:
                     c += tr.cost_t()
                 else:
                     error('unknown cost type: '+costtype)
-            if SPEEDTEST and n > Navg:
-                break
             if n%2000 == 0:
-                    print('path ',n)
+                    print('path ',n) # I'm alive!
             if STOREDATA:
                 row = idxpath # list of int index pts
                 row.append(c)
@@ -534,26 +517,18 @@ class path:
             if c > cmax:
                 cmax = c
                 pmax = path(self.grid,self.Cm)
-                pmax.path = tmpPath
+                pmax.path = tmpTrajList
                 pmax.Tcost = c
                 nmax = n
             if c < cmin:
                 cmin = c
                 pmin = path(self.grid,self.Cm)
-                pmin.path = tmpPath
+                pmin.path = tmpTrajList
                 pmin.Tcost = c
                 nmin = n
             #print(' path cost: {:4.2f}'.format(c))
             if not LOWMEM:
                 path_costs.append(c)
-        if SPEEDTEST:
-            print('timed {:} paths.'.format(Navg))
-            ts2 = datetime.datetime.now()
-            dt = (ts2-ts1).total_seconds()
-            print('seconds per {:} paths: {:}'.format(Navg, float(dt)))
-            print('seconds per path: {:}'.format(float(dt)/Navg))
-            save_timing(self.searchtype,PCNAME, float(dt)/Navg)
-            quit()
         if not LOWMEM:
             print('quantiling the costs')
             q = [0.25,0.5,0.75,1.0]
@@ -588,19 +563,18 @@ class path:
         print('Saving permutations (paths) to: ',df.name)
         itype = str(type(5))
         ftype = str(type(3.1415))
-        tps = [itype]*(N*N)      # path point seq
+        tps = [itype]*(N*N)      # path point-index sequence
         tps.append(ftype) # the path cost's type
         names = []
         for i in range(N*N):
             names.append('p{:}'.format(i))
         names.append('Cost')
         tps.append(ftype) # the path cost's type
-        df.metadata.d['Ncols'] = len(names)
         df.metadata.d['Types'] = tps
         df.metadata.d['Names'] = names
         df.metadata.d['Ncols'] = N*N+1
-        df.metadata.d['CostType'] = costtype
-        df.metadata.d['SearchType'] = self.searchtype
+        df.metadata.d['CostType'] = costtype # 'energy' or 'time'
+        df.metadata.d['SearchType'] = self.searchtype # 'brute force', 'heuristic' etc.
         df.metadata.d['#samples'] = nsearch
 
         #
@@ -615,7 +589,7 @@ class path:
         maxTies = 0
         for i in range(nsearch):
             if i%2000==0:
-                print('multiple heuristic searches: ',i)
+                print('multiple heuristic searches: ',i)  #I'm alive
             # change start point each time
             self.sr = random.randint(0,N-1)
             self.sc = random.randint(0,N-1)
@@ -624,7 +598,10 @@ class path:
             count = 0
             self.mark[self.sr*N+self.sc] = False # mark our starting point
             self.Tcost = 0.0
+
+            # do the search
             pself,c = self.heuristicSearch()
+
             if pself.maxTiesHSearch > maxTies:
                 maxTies = pself.maxTiesHSearch
             datarow = pself.idxpath
@@ -660,10 +637,11 @@ class path:
         firstrow = self.sr*N + self.sc
         self.idxpath = []  # list if index points
         self.path = [] # list of trajectories
+        self.Tcost = 0.0 # total path cost
         while len(self.path) < N*N-1: # build path up one pt at a time
-            #print('looking for next path pt: row: ',crow)
-            br_next_tr = []   # next point by trajectory
-            br_costs = []  # cost of branch/traj to next point
+            edge_next_tr = []   # next point by trajectory
+            edge_costs = []  # cost of branch/traj to next point
+
             # capture cost of all unmarked,valid branches out of this node
             for ccol in range(N*N):  # ccol is an index
                 if self.mark[ccol]:  # only unvisited
@@ -677,40 +655,45 @@ class path:
                         else:
                             error('unknown cost type: '+costtype)
                         #print('  cost:',ccost)
-                        br_next_tr.append(ctraj) # collect all branches out
-                        br_costs.append(ccost)
+                        edge_next_tr.append(ctraj) # collect all branches out
+                        edge_costs.append(ccost)   # costs of these branches
             # now we have to choose a random branch having min cost
-            if len(br_next_tr)==0:
+            if len(edge_next_tr)==0:
                 error('somethings wrong: i cant find a next node!')
-            minCost = min(br_costs) # will be either a time or energy cost
-            epsilon = 0.05*minCost  # within 5% is a tie
+            minCost = min(edge_costs) # will be either a time or energy cost
+            epsilon = 0.02*minCost  # within 5% is a tie
             tiebreakerlist = []
-            ctmplist = []
-            for i,t in enumerate(br_next_tr): # go through all traj's leaving this pt
-                if abs(br_costs[i]-minCost)<epsilon: # if it's close to min
+            costTmpList = []
+
+            for i,t in enumerate(edge_next_tr): # go through all traj's leaving this pt
+                if abs(edge_costs[i]-minCost)<epsilon: # if it's close to min
                     tiebreakerlist.append(t)
-                    ctmplist.append(br_costs[i]) #costs of the tied traj's
+                    costTmpList.append(edge_costs[i]) #costs of the tied traj's
+
+            # debugging junk
             if False and len(tiebreakerlist)>1:
                 depth = len(self.idxpath)
                 print(depth,': tie: ',len(tiebreakerlist), tiebreakerlist)
-                print('costs: ',ctmplist)
+                print('costs: ',costTmpList)
                 print(' minCost: ', minCost, 'epsil:', epsilon)
                 if False:
-                    print('current next traj list: ',len(br_next_tr),'entries')
-                    #print(br_next_tr)
+                    print('current next traj list: ',len(edge_next_tr),'entries')
+                    #print(edge_next_tr)
                     print('current cost list:')
-                    print(sorted(br_costs))
+                    print(sorted(edge_costs))
                     print('minCost:', minCost)
                     x = input('?...')
                     print('\n\n')
             if len(tiebreakerlist)>maxTies:
                 maxTies = len(tiebreakerlist)
+
             # pick a random entry from the ties
             newtraj = random.choice(tiebreakerlist)
             cminidx=ij2idx(newtraj.p2.row,newtraj.p2.col) # index of next point
+
+            # Some error checks here
             if not self.mark[cminidx]:
                 error('new path point is marked already')
-            self.mark[cminidx] = False  # do not visit this point again
             if not newtraj.valid:
                 print('crow', crow, 'ccol: ', ccol)
                 error('path: invalid new trajectory')
@@ -721,17 +704,19 @@ class path:
                     print('crow/firstrow: ', crow, firstrow)
                     print('adding traj: ', t)
                     error('path trajectories dont connect! '+str(crow))
+
+            # OK error checks passed
+            self.mark[cminidx] = False  # do not visit this point again
             self.path.append(newtraj)
-            # also keep the path as list of indeces
+            # also keep the path as list of indices
             pathptidx = ij2idx(newtraj.p1.row,newtraj.p1.col)
             self.idxpath.append(pathptidx)
             #print('    adding traj to path: ', self.path[-1])
             crow = cminidx
-            self.Tcost += minCost
-            self.maxTiesHSearch = maxTies # save this
-            #print('Total path cost ({:}) = {:8.2f}: '.format(costtype,self.Tcost))
-        t = self.path[-1]
+            self.Tcost += minCost  # close enough(!)
+            self.maxTiesHSearch = maxTies # save this (multi-hsearch will max(max(ties)))
         # don't forget the last point in the path
+        t = self.path[-1]
         pathendpt = ij2idx(t.p2.row,t.p2.col)
         self.idxpath.append(pathendpt)
         #return path object, float
