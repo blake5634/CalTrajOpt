@@ -56,12 +56,13 @@ def main(args):
         cto.error('Please run getCostHisto in this data first')
     y = df.metadata.d['CostHistogram_values']
     npts = sum(y)
+    barwidth = 0.75*(max(x)-min(x))/len(x)
     mu = df.metadata.d['CostMean']
     sd = df.metadata.d['CostStDev']
     ct = df.metadata.d['CostType']
     hc = df.hashcode
 
-    plt.bar(x,y,width=0.5,color='b')
+    plt.bar(x,y,width=barwidth,color='b')
     plt.title('{:} cost distribution, n={:} samples'.format(ct,npts))
     plt.xlabel('Cost      ({:})'.format(hc))
     plt.ylabel('# paths')

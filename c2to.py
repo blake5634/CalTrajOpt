@@ -15,10 +15,10 @@ def error(msg):
     print(msg)
     quit()
 
-PCNAME = 'XPS-13'
+#PCNAME = 'XPS-13'
 PCNAME = 'XPS-15'
-PCNAME = 'beagle'
-PCNAME = 'IntelNUC'
+#PCNAME = 'beagle'
+#PCNAME = 'IntelNUC'
 
 N = 4
 
@@ -218,6 +218,7 @@ class trajectory2D:
                 x.append(self.x(t2))
                 v.append(self.xd(t2))
                 a.append(self.xdd(t2))
+            # add last points to close
             t.append(self.dt)
             x.append(self.x(self.dt))
             v.append(self.xd(self.dt))
@@ -264,8 +265,10 @@ class Cm: # matrix full of trajectory2D objs
                         m=max(i1,j1,i2,j2)
                         if m>N-1:
                             error('index too big: {:}/{:}'.format(m,N))
-                        r = i1*N + j1
-                        c = i2*N + j2
+                        #r = i1*N + j1
+                        #c = i2*N + j2
+                        r = ij2idx(i1,j1)  # point to row and col
+                        c = ij2idx(i2,j2)  # of the cost matrix
                         #print('r,c:',r,c)
                         #print('i1, j1, i2, j2:',i1,j1,i2,j2)
                         p1 = grid.gr[i1][j1]
@@ -275,7 +278,7 @@ class Cm: # matrix full of trajectory2D objs
                         if (p1.x == p2.x and p1.v == p2.v):
                             t.valid = False  # eliminate self transitions
                         else:
-                            t.compute(DT_TEST) #get coeffs
+                            #t.compute(DT_TEST) #get coeffs
                             t.constrain_A()    #constrain for Amax
                             a = t.timeEvolution(ACC_ONLY=True)
                             #compute traj costs
@@ -366,6 +369,8 @@ class path:
                 print('{:12.2f} hrs'.format(hrs))
                 print('{:12.2f} days'.format(days))
                 print('{:12.2f} years'.format(years))
+                if mins>2:
+                    x = input('Ok to continue? ...')
         else:
             print('no search speed info available for your configuration')
 
@@ -510,7 +515,7 @@ class path:
                 tr.constrain_A()
                 tmpPath.append(tr)
                 if costtype == 'energy':
-                    x,v,a,t = tr.timeEvolution()
+                    a = tr.timeEvolution(ACC_ONLY=True)
                     c += tr.cost_e(a)
                 elif costtype == 'time':
                     c += tr.cost_t()
