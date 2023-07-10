@@ -24,6 +24,7 @@ def main(args):
             filenameroots.append(str(f).replace('.csv',''))
         if  '_meta.json' in f:
             filenameroots.append(str(f).replace('_meta.json',''))
+    # dict.fromkeys better than set because preserves order (thanks google)
     filenameroots = list(dict.fromkeys(filenameroots)) # elim dupes
 
 
@@ -31,9 +32,10 @@ def main(args):
     #  OK - now lets check all metadatas
     #
     remlist = []
+    remlistCSV = []
     for fnr in filenameroots:
         mdname = fnr+'_meta.json'
-        if(os.path.exists(mdname)):
+        if(os.path.exists(mdname)):  # if we can find a metadata file
             df = bd.datafile('', '','')  # open it with blank title info
             df.set_folders(datadir,'')        # set these to wherever you want to open datafiles
             df.open(mode='r',tname=mdname)
@@ -49,16 +51,29 @@ def main(args):
                 print('failed to access research question (old files)', fnr)
         else:
             print('non existent metadata file: ',fnr)
+            remlistCSV.append(fnr+'.csv')
 
-    print('\n\nPlanning to remove the following file names (.jason and .csv):')
-    for fn in remlist:
-        print(fn)
+    if len(remlist) > 0:
+        print('\n\nPlanning to remove the following file names (.jason and .csv):')
+        for fn in remlist:
+            print(fn)
 
-    x = input('\n\n          OK to delete files?? ...')
+        x = input('\n\n          OK to delete these files?? ...')
 
-    for fn in remlist:
-        print(' ... removing ',fn)
-        os.remove(fn)
+        for fn in remlist:
+            print(' ... removing ',fn)
+            os.remove(fn)
+
+    if len(remlistCSV) > 0:
+        print('\n\nPlanning to remove the following .csv files which have no metadata:')
+        for fn in remlistCSV:
+            print(fn)
+
+        x = input('\n\n          OK to delete these files?? ...')
+
+        for fn in remlistCSV:
+            print(' ... removing ',fn)
+            os.remove(fn)
 
     print('.. Done')
 

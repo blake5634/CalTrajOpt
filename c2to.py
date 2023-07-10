@@ -576,6 +576,7 @@ class path:
 
     def multiHSearch(self,dfile,nsearch):
         ts1 = datetime.datetime.now()
+        self.datafile = dfile #keep track of this for adding metadata
         df = dfile
         print('Saving permutations (paths) to: ',df.name)
         itype = str(type(5))
@@ -604,6 +605,7 @@ class path:
         pmax = None
         cmin = 99999999999
         cmax = 0
+        maxTies = 0
         for i in range(nsearch):
             if i%2000==0:
                 print('multiple heuristic searches: ',i)
@@ -616,6 +618,8 @@ class path:
             self.mark[self.sr*N+self.sc] = False # mark our starting point
             self.Tcost = 0.0
             pself,c = self.heuristicSearch()
+            if pself.maxTiesHSearch > maxTies:
+                maxTies = pself.maxTiesHSearch
             datarow = pself.idxpath
             #print('my path: ',datarow)
             datarow.append(c) # last col is cost
@@ -632,18 +636,20 @@ class path:
                 pmax.Tcost = c
         df.metadata.d['Min Cost']=cmin
         df.metadata.d['Max Cost']=cmax
+        df.metadata.d['Max Ties']=maxTies
         print('Lowest cost path: ', pmin)
         print('path cost: ', cmin)
         print('Highest cost path: ', pmax)
         print('path cost: ', cmax)
+        print('Max # of ties: ',maxTies)
         df.close()
-        self.datafile = df
         # return path object, float
         return pmin,pmin.Tcost
 
     def heuristicSearch(self):  # path class
         # add to self.path[] one traj at a time greedily
         crow = self.sr*N + self.sc  # starting point in cost matrix
+        maxTies = 0 # keep track of highest # of tie costs
         firstrow = self.sr*N + self.sc
         self.idxpath = []  # list if index points
         self.path = [] # list of trajectories
@@ -670,17 +676,19 @@ class path:
             if len(br_next_tr)==0:
                 error('somethings wrong: i cant find a next node!')
             minCost = min(br_costs) # will be either a time or energy cost
-            epsilon = 0.25*minCost  # within 2% is a tie
+            epsilon = 0.05*minCost  # within 5% is a tie
             tiebreakerlist = []
-            for i,t in enumerate(br_next_tr): # go through all traj's
+            ctmplist = []
+            for i,t in enumerate(br_next_tr): # go through all traj's leaving this pt
                 if abs(br_costs[i]-minCost)<epsilon: # if it's close to min
                     tiebreakerlist.append(t)
-            if len(tiebreakerlist)>1:
-                print('tie: ',len(tiebreakerlist), tiebreakerlist)
+                    ctmplist.append(br_costs[i]) #costs of the tied traj's
+            if False and len(tiebreakerlist)>1:
+                depth = len(self.idxpath)
+                print(depth,': tie: ',len(tiebreakerlist), tiebreakerlist)
+                print('costs: ',ctmplist)
                 print(' minCost: ', minCost, 'epsil:', epsilon)
-                stoppt = 7
-                #if len(self.idxpath) == stoppt: # debug in middle
-                if True:
+                if False:
                     print('current next traj list: ',len(br_next_tr),'entries')
                     #print(br_next_tr)
                     print('current cost list:')
@@ -688,6 +696,8 @@ class path:
                     print('minCost:', minCost)
                     x = input('?...')
                     print('\n\n')
+            if len(tiebreakerlist)>maxTies:
+                maxTies = len(tiebreakerlist)
             # pick a random entry from the ties
             newtraj = random.choice(tiebreakerlist)
             cminidx=ij2idx(newtraj.p2.row,newtraj.p2.col) # index of next point
@@ -711,6 +721,7 @@ class path:
             #print('    adding traj to path: ', self.path[-1])
             crow = cminidx
             self.Tcost += minCost
+            self.maxTiesHSearch = maxTies # save this
             #print('Total path cost ({:}) = {:8.2f}: '.format(costtype,self.Tcost))
         t = self.path[-1]
         # don't forget the last point in the path
