@@ -17,7 +17,7 @@ def error(msg):
     print(msg)
     quit()
 
-PCNAME = socket.gethostbyname()
+PCNAME = str(socket.gethostname())
 N = 4
 
 AMAX = 2  #  normalize for now.
@@ -72,48 +72,49 @@ def idx2ij(idx):
     j = idx-N*i
     return i,j
 
-def predict_timing(nsamp):
+def predict_timing(searchtype, nsamp):
       #
         # predict the search timing
         #
         OK = True
         if os.path.isfile('searchTiming.json'):
-            key = searchtype+PCNAME
+            key = searchtype + '-' + PCNAME
             fd = open('searchTiming.json','r')
             d = json.load(fd)
-            print('n samples:',nsamples)
-            key = PCNAME
+            print('n samples:',nsamp)
             try:
                 t = d[key]
             except:
                 OK=False
-                break
-            print('your predicted search time is:')
-            print('search type/PC:',key)
-            print('rate:          ',d[key],'/sec')
-            sec = float(d[key])*nsamples
-            mins = sec/60
-            hrs = mins/60
-            days = hrs/24
-            years = days/365
-            print('predicted time: ')
-            fmth='{:10} {:12} {:12} {:12} {:12}'
-            print(fmth.format('PC type','mins','hrs','days','years')
-            fmts='{:10} {:12.2f} {:12.2f} {:12.2f} {:12.2f}'
-            if mins>2:
-                x=input('OK to continue? ...')
+            if OK:
+                print('your predicted search time is:')
+                print('search type/PC:',key)
+                print('rate:          ',d[key],'/sec')
+                sec = float(d[key])*nsamp
+                mins = sec/60
+                hrs = mins/60
+                days = hrs/24
+                years = days/365
+                print('predicted time: ')
+                fmth='{:30} {:>12} {:>12} {:>12} {:>12}'
+                print(fmth.format('PC type','mins','hrs','days','years'))
+                fmts='{:30} {:12.2f} {:12.2f} {:12.2f} {:12.2f}'
+                print(fmts.format(key, mins,hrs,days,years))
+                if mins>2:
+                    x=input('OK to continue? ...')
         else:
-            OK=False
+            OK=False #path is not a file
         if not OK:
-            print('no search speed info available for your configuration')
+            print('no search speed info available for your configuration: ',key)
+            x=input('OK to continue? ...')
 
-def save_timing(searchname,pc,rate):
+def save_timing(searchname,systemName,rate):
     if os.path.isfile('searchTiming.json'):
         fd = open('searchTiming.json','r')
         d = json.load(fd)
     else:
         d = {}
-    d[searchname+pc] = rate
+    d[searchname+'-'+systemName] = rate
     fd = open('searchTiming.json','w')
     json.dump(d,fd,indent=4)
     return
@@ -381,7 +382,7 @@ class path:
     def search(self,searchtype,dfile=None,nsamples=1000):
         self.searchtype = searchtype
 
-        predict_timing(nsamples)
+        predict_timing(searchtype, nsamples)
         #
         #  start timer
         ts1 = datetime.datetime.now()
@@ -470,7 +471,7 @@ class path:
                 random.shuffle(p) # generate a path as random list of indices
                 pthash = ''
                 for j in p:
-                    pthash += +='{:3d}'.format(j) # 'hash' the list
+                    pthash +='{:3d}'.format(j) # 'hash' the list
                 if pthash not in phashset: # we've found a new pt
                     piter.append(p)
                     phashset.add(pthash)

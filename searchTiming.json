@@ -1,4 +1,6 @@
 {
-    "multi heuristicIntelNUC": 9.986999999999999e-05,
-    "multi heuristicXPS-15": 7.647140000000001e-05
+    "multi heuristic-XPS-15": 7.647140000000001e-05,
+    "sampling search-blake-NUC": 0.00044255380000000005,
+    "multi heuristic-blake-NUC": 5.36829e-05,
+    "brute force-blake-NUC": 0.0094965932
 }
