@@ -45,11 +45,6 @@ def main(args):
     df.metadata.polish()  # convert metadata from strings to useful types
     print(df.metadata)
 
-    print('')
-    print('first rows of data are:')
-    df.print_header()
-    n=0
-
     cmin = df.metadata.d['Min Cost']
     cmax = df.metadata.d['Max Cost']
     NBINS = 20
@@ -87,19 +82,21 @@ def main(args):
     print('Cost histogram: {:}'.format(df.metadata.d['CostType']))
     fullims = np.append(np.array([cmin]),binlims)
 
-    for i,b in enumerate(bins):
-        if i>0:
-            print('{:3d} {:5.2f} - {:5.2f} | {:}'.format(i,fullims[i-1],fullims[i],b))
+    print(' ... please see metadata: ', df.hashcode)
+    #for i,b in enumerate(bins):
+        #if i>0:
+            #print('{:3d} {:5.2f} - {:5.2f} | {:}'.format(i,fullims[i-1],fullims[i],b[i-1]))
+
     df.metadata.d['CostHistogram_values'] = bins
     df.metadata.d['CostHistogram_levels'] = list(fullims)
     df.metadata.save()
     df.close()
 
-    if True:  #CSV version
+    if False:  #CSV version
         print('\n\n    CSV version\n')
         for i,b in enumerate(bins):
             if i>0:
-                print('{:5.2f}, {:}'.format(fullims[i-1],b))
+                print('{:5.2f}, {:}'.format(fullims[i-1],b[i-1]))
     print('\n\n')
 
 

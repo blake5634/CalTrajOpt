@@ -445,7 +445,6 @@ class path:
             for i in range(N*N):
                 names.append('p{:}'.format(i))
             names.append('Cost')
-            tps.append(ftype) # the path cost's type
             dfbf.metadata.d['Ncols'] = len(names)
             dfbf.metadata.d['Types'] = tps
             dfbf.metadata.d['Names'] = names
@@ -570,7 +569,6 @@ class path:
         for i in range(N*N):
             names.append('p{:}'.format(i))
         names.append('Cost')
-        tps.append(ftype) # the path cost's type
         df.metadata.d['Types'] = tps
         df.metadata.d['Names'] = names
         df.metadata.d['Ncols'] = N*N+1
@@ -588,37 +586,40 @@ class path:
         cmin = 99999999999
         cmax = 0
         maxTies = 0
-        for i in range(nsearch):
+        nperstart = nsearch//(N*N)
+        for i in range(N*N): # go through the start pts
             if i%2000==0:
                 print('multiple heuristic searches: ',i)  #I'm alive
-            # change start point each time
-            self.sr = random.randint(0,N-1)
-            self.sc = random.randint(0,N-1)
-            # reset search info
-            self.mark = [True for x in range(N*N)]
-            count = 0
-            self.mark[self.sr*N+self.sc] = False # mark our starting point
-            self.Tcost = 0.0
+            # go through the N^2 start points with equal number at each
+            ip,jp = idx2ij(i)  # define the start point
+            self.sr = ip
+            self.sc = jp
+            for m in range(nperstart): # do each start pt this many times
+                # reset search info
+                self.mark = [True for x in range(N*N)]
+                count = 0
+                self.mark[i] = False # mark our starting point
+                self.Tcost = 0.0
 
-            # do the search
-            pself,c = self.heuristicSearch()
+                # do the search
+                pself,c = self.heuristicSearch() #including random tie breakers
 
-            if pself.maxTiesHSearch > maxTies:
-                maxTies = pself.maxTiesHSearch
-            datarow = pself.idxpath
-            #print('my path: ',datarow)
-            datarow.append(c) # last col is cost
-            df.write(datarow)
-            if c < cmin: # find lowest cost of the runs
-                cmin=c
-                pmin = path(self.grid,self.Cm)
-                pmin.path = pself.path
-                pmin.Tcost = c
-            if c > cmax: # find highest cost
-                cmax = c
-                pmax = path(self.grid,self.Cm)
-                pmax.path = self.path
-                pmax.Tcost = c
+                if pself.maxTiesHSearch > maxTies:
+                    maxTies = pself.maxTiesHSearch
+                datarow = pself.idxpath
+                #print('my path: ',datarow)
+                datarow.append(c) # last col is cost
+                df.write(datarow)
+                if c < cmin: # find lowest cost of the runs
+                    cmin=c
+                    pmin = path(self.grid,self.Cm)
+                    pmin.path = pself.path
+                    pmin.Tcost = c
+                if c > cmax: # find highest cost
+                    cmax = c
+                    pmax = path(self.grid,self.Cm)
+                    pmax.path = self.path
+                    pmax.Tcost = c
         df.metadata.d['Min Cost']=cmin
         df.metadata.d['Max Cost']=cmax
         df.metadata.d['Max Ties']=maxTies

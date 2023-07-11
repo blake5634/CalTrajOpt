@@ -1,7 +1,7 @@
 # path search parameters
-costtype time
-N        4
-amax     2
-NPC     10
+costtype   time
+N          4
+amax       2
+NPC       10
 startrow   0
 startcol   0

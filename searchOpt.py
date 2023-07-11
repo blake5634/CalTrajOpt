@@ -1,17 +1,29 @@
 #!/usr/bin/python3
 
-import logging
+import numpy as np
 import c2to as cto
 import sys
 import brl_data.brl_data as bd
+import datetime as dt
+
 #import matplotlib.pyplot as plt
 
 
 def main(args):
+
+    ###################################################
+    #    Search type and size
+    #
+
     #SEARCHT = 'heuristic search' # greedy nearest neighbor
-    SEARCHT = 'brute force'   # enumerate all paths
-    #SEARCHT = 'sampling search' # random paths
+    #SEARCHT = 'brute force'   # enumerate all paths
+    #SEARCHT = 'sampling search' # nsearch random paths
     SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
+
+    #nsearch = int(np.math.factorial(9)* 0.10)  # 10% of 3x3
+    nsearch = 1000000  # 1M
+    #
+    ###################################################
 
     # create a path and plot it graphically
     cto.configure()
@@ -39,20 +51,22 @@ def main(args):
         df.metadata.d['ResearchQuestion'] = input('Enter research question:')
     #  cto.point2D.search() will take care of metatada setup
 
-
-    ###################################################
-    #    Search Size
-    #
-    nsearch = 100000
-    #
-    ###################################################
-
     path2, cmin = p.search(SEARCHT, dfile=df, nsamples=nsearch)
 
     # is it a valid path?
     #p.check()
 
     notes = '{:}, cost: {:4.2f} ({:})'.format(SEARCHT, cmin, cto.costtype)
+
+    #  keep a "log book"
+
+    now = dt.datetime.now()
+    dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
+    logentry = '{:}, {:}, {:},  RQ: {:}'.format(dtstring,df.hashcode, notes, df.metadata.d['ResearchQuestion'])
+
+    f =open('search_logbook.txt','a')
+    print(logentry,file=f)
+    f.close()
 
     print('your data file hash is:',df.hashcode)
     # graph the path
