@@ -7,3 +7,4 @@
 2023-07-11 13:38:09, 1f0ad47b, sampling search, cost: 15.52 (time),  RQ: 4x4x1MGreedySearch distrib
 2023-07-11 14:06:11, cc71bef2, multi heuristic, cost: 19.24 (energy),  RQ: 4x4 grid 1M heurstic energy cost
 2023-07-11 14:13:38, f0f45ab5, multi heuristic, cost: 11.03 (time),  RQ: 4x4x1MgreedySearch distrb for time cost
+2023-07-13 12:50:21, f8372f38, sampling search, cost: 8.77 (time),  RQ: redo of 29e83f59: 3x3 10% sampled time cost
