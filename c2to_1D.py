@@ -119,24 +119,24 @@ def save_timing(searchname,systemName,rate):
     json.dump(d,fd,indent=4)
     return
 
-class grid2D:
-    def __init__(self, N):
-        self.N = N
-        self.gr = []
-        for i in range(self.N):
-            row = []
-            for j in range(self.N):
-                row.append(point2D(i,j))
-            self.gr.append(row)
+#class grid2D:
+    #def __init__(self, N):
+        #self.N = N
+        #self.gr = []
+        #for i in range(self.N):
+            #row = []
+            #for j in range(self.N):
+                #row.append(point2D(i,j))
+            #self.gr.append(row)
 
-    def __repr__(self):
-        txt = ''
-        for i in range(self.N):
-            txt += '       '
-            for j in range(self.N):
-                txt +=  ' ({:5.2f},{:5.2f})'.format(self.gr[i][j].x, self.gr[i][j].v)
-            txt += '\n'
-        return txt
+    #def __repr__(self):
+        #txt = ''
+        #for i in range(self.N):
+            #txt += '       '
+            #for j in range(self.N):
+                #txt +=  ' ({:5.2f},{:5.2f})'.format(self.gr[i][j].x, self.gr[i][j].v)
+            #txt += '\n'
+        #return txt
 
 class point2D:
     def __init__(self,i,j):
@@ -425,7 +425,7 @@ class path:
             print('   Sampling {:} paths out of {:12.5e}'.format(nsamples,float(n_all_paths)))
 
         LOWMEM = False
-        if N>3:
+        if N>3 and not sampling:
             LOWMEM = True  # we just can't store that many paths
 
         if dfile is not None:
@@ -844,9 +844,6 @@ def tests():
     print('Cm tests: ')
     print(c1)
 
-    print('grid2D tests:')
-    gt = grid2D(N)
-    print(gt)
 
     print('cost tests')
 
