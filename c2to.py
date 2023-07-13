@@ -235,7 +235,9 @@ class point3D:
 
 class trajectory3D:
     def __init__(self,p1,p2):
-        if str(type(p1)) != "<class 'c2to.point3D'>" or str(type(p2)) != "<class 'c2to.point3D'>":
+        ptest = point3D(getcoord(1234))
+        type3Dpt = str(type(ptest))
+        if str(type(p1)) != type3Dpt or str(type(p2)) != type3Dpt:
             error('trajectory3D called with 1D point!')
         #print('trajectory3D: p1,p2: ',p1,p2)
         self.p1 = p1
@@ -383,11 +385,13 @@ class trajectory3D:
         for i in range(3):
             for a1 in a:
                 c += self.dt*a1[i]*a1[i]/n
+        self.e_cost = c
         return c
 
     def cost_t(self, a):  # need a parameter for efficient calling though not used(!)
         if not self.computed and not self.constrained:
             error('Cant compute cost_t until trajectory is computed and constrained')
+        self.t_cost = self.dt
         return self.dt
 
 
@@ -519,19 +523,25 @@ class Cm:
 
     def fill(self):
         print('starting fill...')
+        nf = 0
         for i1 in range(M):  # go through all grid points
             for j1 in range(M):
+                nf+=1
+                if nf%20000==0:
+                    pct = i1/M
+                    print('fill is {:.0%} done'.format(pct))
                 p1 = point3D(getcoord(i1))
                 p2 = point3D(getcoord(j1))
                 t = trajectory3D(p1,p2)
-                if (p1.x == p2.x and p1.v == p2.v):
+                if (p1 == p2):
                     t.valid = False  # eliminate self transitions
                 else:
                     t.compute(DT_TEST)
                     t.constrain_A()
                     a = t.timeEvolution(ACC_ONLY=True)
                     t.cost_e(a)
-                    t.cost_t()
+                    assert t.e_cost > 0.0
+                    t.cost_t(a)
                 self.m[i1][j1] = t
         print('done with fill...')
 
@@ -1249,14 +1259,21 @@ class path3D:
 
 def tests():
 
+    epsilon = 0.02
+
+    configure()
+
+    print('Commencing tests: 6D, N=',N)
 
     print('index <--> coordinates test')
 
     v=[0,0,0]
 
-    v[0] = [1,1,1,1,1,1]
-    v[1] = [3,3,3,2,3,3]
-    v[2] = [3,2,1,3,3,2]
+    for i in range(3):
+        v[i] = [0]*6
+        for j in range(6):
+            v[i][j] = random.choice(range(N))
+        print('v: [',i,']:',v[i])
 
     for i in range(3):
             x = getcoord(getidx(v[i]))
@@ -1265,34 +1282,33 @@ def tests():
 
 
     c1 = Cm()
-    print (c1.m)
+    c1.fill()
 
     print('Cm tests: ')
-    print(c1)
 
-    print('grid1D tests:')
-    gt = grid1D(N)
-    print(gt)
+    r,c = np.shape(c1.m)
+
+    assert r==c
+    assert r == N**6
+
+    p1 = point3D(getcoord(1234))
+    p2 = point3D(getcoord(2345))
+    tr12 = trajectory3D(p1,p2)
+    tt3d = type(tr12)
+    assert type(c1.m[10][10]) == tt3d
+
+    print('   Cm tests:  PASSED')
 
     print('cost tests')
+    tr12.constrain_A()
+    a = tr12.timeEvolution(ACC_ONLY=True)
+    assert abs(max(a)-amax)/amax < epsilon
+    assert tr12.e_cost > 0
+    assert tr12.t_cost > 0
 
-    p1 = point1D(0,0)
-    p2 = point1D(N,N)
-    print ('{:5.1f}'.format(trajectory1D(p1,p2).cost_e()))
-    p3 = point1D(1,1)
-    print ('{:5.1f}'.format(trajectory1D(p1,p3).cost_e()))
 
-    print('fill tests')
-    c1.fill(gt)
+    print('cost tests:     PASSED')
 
-    r = 2
-    c = 2
-    print('visualize cost from point ({:},{:})'.format(r,c))
-    c1.visualize(gt,r,c)
-
-    # try a path:
-    p = path(gt,c1,r,c)
-    print(p)
 
 
 if __name__ ==  '__main__':
