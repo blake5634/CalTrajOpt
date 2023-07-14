@@ -2,7 +2,7 @@
 #costtype time
 costtype energy
 N        3
-amax    20 
+amax       2
 NPC     10
 startrow   7
 startcol   7

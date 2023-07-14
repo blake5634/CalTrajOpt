@@ -4,7 +4,9 @@ import socket
 import numpy as np
 import matplotlib.pyplot as plt
 import brl_data.brl_data as bd
+import datetime
 import sys
+import os
 import random
 
 def error(msg):
@@ -90,8 +92,8 @@ def predict_timing(searchtype, nsamp):
         # predict the search timing
         #
         OK = True
+        key = searchtype + '-' + PCNAME
         if os.path.isfile('searchTiming.json'):
-            key = searchtype + '-' + PCNAME
             fd = open('searchTiming.json','r')
             d = json.load(fd)
             print('n samples:',nsamp)
@@ -314,7 +316,7 @@ class trajectory3D:
         #
         # adaptive dt
         #
-        dt = 3 #start with 'fast' dt
+        dt = 1.0 #start with 'fast' dt
         ni = 0
         while True:
             ni += 1
@@ -394,6 +396,9 @@ class trajectory3D:
         self.t_cost = self.dt
         return self.dt
 
+
+    def __repr__(self):
+        return str(self.p1) + ' ---> ' + str(self.p2)
 
 #class trajectory1D:
     #def __init__(self,p1,p2):
@@ -649,7 +654,7 @@ class path3D:
         self.mark[self.sr*N+self.sc] = False # mark our starting point
         self.Tcost = 0.0
         self.path = []  # the path as a list of trajectories
-        self.idxpath = [] # the path as a list of indeces (0..N**6)
+        self.idxpath = [] # the path as a list of indices (0..N**6)
         self.searchtype = 'none yet'
         self.datafile = None
 
@@ -664,7 +669,7 @@ class path3D:
         #  select the type of search to do
         #
         if searchtype.startswith('heur'):
-            p, cmin = self.heuristicSearch(dfine,)
+            p, cmin = self.heuristicSearch()
         elif searchtype.startswith('multi'):
             if dfile is None:
                 error('path.search: multi heuristic search requires a dfile')
@@ -745,7 +750,7 @@ class path3D:
         print('We are generating {:} random paths through {:} nodes'.format(nsamples,N**6))
         piter = []
         phashset = set()
-        for i in range(nsamples):
+        while len(phashset) < nsamples:
             p = list(range(N**6))
             random.shuffle(p) # generate a path as random list of indices
             pthash = ''
@@ -768,14 +773,15 @@ class path3D:
         cmax = 0
         pmin = []
         for p in piter:  # piter returns list of point indices
+            # p is the current path [idx0,idx1,idx2 ...]
+            # now get the cost of p
             idxpath = list(p)
             n += 1
             c = 0.0 #accumulate cost along path
             tmpTrajList = []
             for i in range(len(idxpath)-1):
                 # build next trajectory
-                tr = self.point3D.Cm.m[i]
-                tr.constrain_A()
+                tr = self.Cm.m[idxpath[i]][idxpath[i+1]] #traj from current pt to next one
                 tmpTrajList.append(tr)
                 if costtype == 'energy':
                     c += tr.e_cost
@@ -792,7 +798,7 @@ class path3D:
             if c > cmax:
                 cmax = c
                 pmax = path(self.grid,self.Cm)
-                pmax.path = tmpTrajList
+                pmax.path = tmpTrajList # list of trajectories
                 pmax.Tcost = c
                 nmax = n
             if c < cmin:
@@ -861,7 +867,7 @@ class path3D:
                 # reset search info
                 self.mark = [True for x in range(N**6)]
                 count = 0
-                self.mark[i] = False # mark our starting point
+                self.mark[startPtIdx] = False # mark our starting point
                 self.Tcost = 0.0
 
                 # do the search
@@ -1257,6 +1263,8 @@ class path3D:
 
 
 def tests():
+    import pickle
+    import os
 
     epsilon = 0.02
 
@@ -1290,21 +1298,33 @@ def tests():
     SKIPFILL = False  # save time to focus on later tests
 
     if not SKIPFILL:
-        c1.fill()
-
+        pname = 'c1Costs.pickle'
+        if os.path.exists(pname):
+            print('loading precomputed cost matrix   ...')
+            f = open(pname, 'rb')
+            c1 = pickle.load(f)
+            print(' loading completed')
+        else:
+            print('no stored data: computing cost matrix')
+            c1.fill()
+            f = open(pname,'wb')
+            pickle.dump(c1,f)
 
     r,c = np.shape(c1.m)
 
     assert r==c
     assert r == N**6
 
-    p1 = point3D(getcoord(3100))
-    p2 = point3D(getcoord(0))
+    p1 = point3D(getcoord(1234))
+    p2 = point3D(getcoord(3241))
     tr12 = trajectory3D(p1,p2)
     tt3d = type(tr12)
 
     if not SKIPFILL:
+        # [10][10] is just a "random" traj
         assert type(c1.m[10][10]) == tt3d
+        assert not c1.m[10][10].valid  # self-self transitions invalid.
+        assert c1.m[10][11].valid
     else:
         print('\n                 fill test skipped!!\n')
         c1.m[10][10] = tr12
@@ -1312,20 +1332,26 @@ def tests():
     print('   Cm tests:  PASSED')
 
     print('\n\n   Amax tests')
-    #print('AMAX: ',AMAX)
-    tr12.constrain_A()
-    a = tr12.timeEvolution(ACC_ONLY=True)
-    amax_min = 9999999999
-    for i in range(3):
-        #print('amax[i]: ',max(a[i]), min(a[i]))
-        # is acceleration properly constrained?
-        mx = max(abs(max(a[i])), abs(min(a[i])))
-        amax_diff = abs(mx-AMAX)/AMAX
-        if amax_diff < amax_min:
-            amax_min = amax_diff
-        #print('amax_min: ',amax_min) # how close peak acc is to AMAX
-    # test that amax is close to AMAX
-    assert amax_min < epsilon
+    print('AMAX: ',AMAX)
+    for i in range(10):
+        p1 = point3D(getcoord(random.randint(0,N**6-1)))
+        p2 = point3D(getcoord(random.randint(0,N**6-1)))
+        tr12.p1 = p1
+        tr12.p2 = p2
+        tr12.constrain_A()
+        print('Amax test: tr12:',tr12)
+        a = tr12.timeEvolution(ACC_ONLY=True)
+        amax_min = 9999999999
+        for i in range(3):
+            #print('amax[i]: ',max(a[i]), min(a[i]))
+            # is acceleration properly constrained?
+            mx = max(abs(max(a[i])), abs(min(a[i])))
+            amax_diff = abs(mx-AMAX)/AMAX
+            if amax_diff < amax_min:
+                amax_min = amax_diff
+        print('             amax_min: ',amax_min) # how close peak acc is to AMAX
+        # test that amax is close to AMAX
+        assert amax_min < epsilon
 
     print('\n\n   Amax tests:   PASSED')
 
@@ -1339,6 +1365,19 @@ def tests():
 
 
     print('cost tests:     PASSED')
+
+    #
+    #  set up a df for search tests
+    #
+    df = bd.datafile('tests','BH','simulation')
+    df.set_folders('','')
+    df.metadata.d['Research Question'] = 'debug and test'
+
+
+    print('search test 1:   sampling random paths')
+    searchtype = 'sampling'
+    bpath = path3D(c1)
+    bpath.search(searchtype,dfile=df,nsamples=10)
 
 
     print('\n\n            ALL tests:     PASSED')
