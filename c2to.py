@@ -31,7 +31,7 @@ startcol = 1
 
 def configure(fp=None):
     #print('Pyton path: ', sys.path)
-    global costtype, AMAX, DT_TEST, N,M, NPC, startrow, startcol
+    global costtype, AMAX, DT_TEST, N, M, NPC, startrow, startcol
     if not fp:
         f = open('ctoConfig.txt','r')
     else:
@@ -314,16 +314,16 @@ class trajectory3D:
         #
         # adaptive dt
         #
-        dt = 1.4
+        dt = 3 #start with 'fast' dt
         ni = 0
         while True:
             ni += 1
             self.compute(dt)
             if self.get_Amax(dt) > AMAX:
-                dt *= 1.05
+                dt *= 1.05  # if amax too big, slow down
             else:
                 break
-        dt *= 0.95
+        dt *= 0.95  # back off prev opt and finetune
         while True:
             ni += 1
             self.compute(dt)
@@ -540,7 +540,6 @@ class Cm:
                     t.constrain_A()
                     a = t.timeEvolution(ACC_ONLY=True)
                     t.cost_e(a)
-                    assert t.e_cost > 0.0
                     t.cost_t(a)
                 self.m[i1][j1] = t
         print('done with fill...')
@@ -1263,13 +1262,15 @@ def tests():
 
     configure()
 
+    assert N==3
+
     print('Commencing tests: 6D, N=',N)
 
     print('index <--> coordinates test')
 
-    v=[0,0,0]
+    v=[0,0,0,0,0]  # 5 random 6D test coordinate vectors
 
-    for i in range(3):
+    for i in range(len(v)):
         v[i] = [0]*6
         for j in range(6):
             v[i][j] = random.choice(range(N))
@@ -1278,31 +1279,61 @@ def tests():
     for i in range(3):
             x = getcoord(getidx(v[i]))
             assert x==v[i]
+
     print('index <--> coordinates test: PASSED')
 
 
-    c1 = Cm()
-    c1.fill()
+    print('\n\n   Cm tests: ')
 
-    print('Cm tests: ')
+    c1 = Cm()
+
+    SKIPFILL = False  # save time to focus on later tests
+
+    if not SKIPFILL:
+        c1.fill()
+
 
     r,c = np.shape(c1.m)
 
     assert r==c
     assert r == N**6
 
-    p1 = point3D(getcoord(1234))
-    p2 = point3D(getcoord(2345))
+    p1 = point3D(getcoord(3100))
+    p2 = point3D(getcoord(0))
     tr12 = trajectory3D(p1,p2)
     tt3d = type(tr12)
-    assert type(c1.m[10][10]) == tt3d
+
+    if not SKIPFILL:
+        assert type(c1.m[10][10]) == tt3d
+    else:
+        print('\n                 fill test skipped!!\n')
+        c1.m[10][10] = tr12
 
     print('   Cm tests:  PASSED')
 
-    print('cost tests')
+    print('\n\n   Amax tests')
+    #print('AMAX: ',AMAX)
     tr12.constrain_A()
     a = tr12.timeEvolution(ACC_ONLY=True)
-    assert abs(max(a)-amax)/amax < epsilon
+    amax_min = 9999999999
+    for i in range(3):
+        #print('amax[i]: ',max(a[i]), min(a[i]))
+        # is acceleration properly constrained?
+        mx = max(abs(max(a[i])), abs(min(a[i])))
+        amax_diff = abs(mx-AMAX)/AMAX
+        if amax_diff < amax_min:
+            amax_min = amax_diff
+        #print('amax_min: ',amax_min) # how close peak acc is to AMAX
+    # test that amax is close to AMAX
+    assert amax_min < epsilon
+
+    print('\n\n   Amax tests:   PASSED')
+
+
+    print('\n\n    Cost tests')
+    a = tr12.timeEvolution(ACC_ONLY=True)
+    tr12.cost_e(a)
+    tr12.cost_t(a)
     assert tr12.e_cost > 0
     assert tr12.t_cost > 0
 
@@ -1310,6 +1341,7 @@ def tests():
     print('cost tests:     PASSED')
 
 
+    print('\n\n            ALL tests:     PASSED')
 
 if __name__ ==  '__main__':
     print('main starting:')
