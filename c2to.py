@@ -72,52 +72,62 @@ def idx2ij(idx):
     j = idx-N*i
     return i,j
 
-def predict_timing(searchtype, nsamp):
-      #
-        # predict the search timing
-        #
-        OK = True
-        if os.path.isfile('searchTiming.json'):
-            key = searchtype + '-' + PCNAME
-            fd = open('searchTiming.json','r')
-            d = json.load(fd)
-            print('n samples:',nsamp)
-            try:
-                t = d[key]
-            except:
-                OK=False
-            if OK:
-                print('your predicted search time is:')
-                print('search type/PC:',key)
-                print('rate:          ',d[key],'/sec')
-                sec = float(d[key])*nsamp
-                mins = sec/60
-                hrs = mins/60
-                days = hrs/24
-                years = days/365
-                print('predicted time: ')
-                fmth='{:30} {:>12} {:>12} {:>12} {:>12}'
-                print(fmth.format('PC type','mins','hrs','days','years'))
-                fmts='{:30} {:12.2f} {:12.2f} {:12.2f} {:12.2f}'
-                print(fmts.format(key, mins,hrs,days,years))
-                if mins>2:
-                    x=input('OK to continue? ...')
-        else:
-            OK=False #path is not a file
-        if not OK:
-            print('no search speed info available for your configuration: ',key)
-            x=input('OK to continue? ...')
+def predict_timing(df, searchtype, nsamp):
+    #
+    # predict the search timing
+    #
+    savedir = ''
+    if df is not None:
+        savedir = df.folder
+    filename = savedir + 'searchTiming.json'
+    OK = True
+    key = searchtype + '-' + PCNAME
+    if os.path.isfile(filename):
+        fd = open(filename,'r')
+        d = json.load(fd)
+        print('n samples:',nsamp)
+        try:
+            t = d[key]
+        except:
+            OK=False
+        if OK:
+            print('your predicted search time is:')
+            print('search type/PC:',key)
+            print('rate:          ',d[key],'/sec')
+            sec = float(d[key])*nsamp
+            mins = sec/60
+            hrs = mins/60
+            days = hrs/24
+            years = days/365
+            print('predicted time: ')
+            fmth='{:30} {:>12} {:>12} {:>12} {:>12}'
+            print(fmth.format('PC type','mins','hrs','days','years'))
+            fmts='{:30} {:12.2f} {:12.2f} {:12.2f} {:12.2f}'
+            print(fmts.format(key, mins,hrs,days,years))
+            if mins>2:
+                x=input('OK to continue? ...')
+    else:
+        OK=False #path is not a file
+    if not OK:
+        print('no search speed info available for your configuration: ',key)
+        x=input('OK to continue? ...')
 
-def save_timing(searchname,systemName,rate):
-    if os.path.isfile('searchTiming.json'):
-        fd = open('searchTiming.json','r')
+def save_timing(df, searchname,systemName,rate):
+    savedir = ''
+    if df is not None:
+        savedir = df.folder
+    filename = savedir + 'searchTiming.json'
+    if os.path.isfile(filename):
+        fd = open(filename,'r')
         d = json.load(fd)
     else:
         d = {}
+    # add to the dict and resave
     d[searchname+'-'+systemName] = rate
-    fd = open('searchTiming.json','w')
+    fd = open(filename,'w')
     json.dump(d,fd,indent=4)
     return
+
 
 class grid2D:
     def __init__(self, N):
@@ -382,7 +392,7 @@ class path:
     def search(self,searchtype,dfile=None,nsamples=1000):
         self.searchtype = searchtype
 
-        predict_timing(searchtype, nsamples)
+        predict_timing(dfile, searchtype, nsamples)
         #
         #  start timer
         ts1 = datetime.datetime.now()
@@ -410,7 +420,7 @@ class path:
         dt = (ts2-ts1).total_seconds()
         print('seconds per {:} paths: {:}'.format(nsamples, float(dt)))
         print('seconds per path: {:}'.format(float(dt)/nsamples))
-        save_timing(searchtype,PCNAME,float(dt)/nsamples)
+        save_timing(dfile,searchtype,PCNAME,float(dt)/nsamples)
         return p,cmin
 
     def sampleSearch(self,dfile=None,nsamples=977):
