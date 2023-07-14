@@ -23,6 +23,8 @@ M = Npts
 
 AMAX = 2  #  normalize for now.
 DT_TEST = 2.0
+DT_START = 1.0  # this needs to be 'smaller' so that Amax can be searched by
+                # lengthening dt, but if too small constrain_A can be too slow.
 
 NPC = 20  # number plot points per curve
 
@@ -55,6 +57,8 @@ def configure(fp=None):
             costtype = v
         if parname == 'amax':
             AMAX = float(v)
+        if parname == 'dt_start': # starting val for constrain_A()
+            DT_START = float(v)
         if parname == 'dt_test':
             DT_TEST = dt_test  # fixed dt value used for testing
         if parname == 'N':
@@ -89,29 +93,30 @@ def getcoord(idx):
         r = (r-v[5-i])//N
     return v
 
-def predict_timing(df, searchtype, nsamp):
+def predict_timing(df, searchtype, systemName, nsamp):
     #
     # predict the search timing
     #
     savedir = ''
     if df is not None:
         savedir = df.folder
+        print('set timing data folder to ',df.folder)
     filename = savedir + 'searchTiming.json'
+    configKey = str(M) + '-' + searchtype + '-' + systemName
     OK = True
-    key = searchtype + '-' + PCNAME
     if os.path.isfile(filename):
         fd = open(filename,'r')
         d = json.load(fd)
         print('n samples:',nsamp)
         try:
-            t = d[key]
+            t = d[configKey]
         except:
             OK=False
         if OK:
             print('your predicted search time is:')
-            print('search type/PC:',key)
-            print('rate:          ',d[key],'/sec')
-            sec = float(d[key])*nsamp
+            print('search type/PC:',configKey)
+            print('rate:          ',d[configKey],'/sec')
+            sec = float(d[configKey])*nsamp
             mins = sec/60
             hrs = mins/60
             days = hrs/24
@@ -120,16 +125,16 @@ def predict_timing(df, searchtype, nsamp):
             fmth='{:30} {:>12} {:>12} {:>12} {:>12}'
             print(fmth.format('PC type','mins','hrs','days','years'))
             fmts='{:30} {:12.2f} {:12.2f} {:12.2f} {:12.2f}'
-            print(fmts.format(key, mins,hrs,days,years))
+            print(fmts.format(configKey, mins,hrs,days,years))
             if mins>2:
                 x=input('OK to continue? ...')
     else:
         OK=False #path is not a file
     if not OK:
-        print('no search speed info available for your configuration: ',key)
+        print('no search speed info available for your configuration: ',configKey)
         x=input('OK to continue? ...')
 
-def save_timing(df, searchname,systemName,rate):
+def save_timing(df, searchtype, systemName,rate):
     savedir = ''
     if df is not None:
         savedir = df.folder
@@ -140,7 +145,8 @@ def save_timing(df, searchname,systemName,rate):
     else:
         d = {}
     # add to the dict and resave
-    d[searchname+'-'+systemName] = rate
+    configKey = str(M) + '-' + searchtype + '-' + systemName
+    d[configKey] = rate
     fd = open(filename,'w')
     json.dump(d,fd,indent=4)
     return
@@ -327,7 +333,7 @@ class trajectory3D:
         #
         # adaptive dt
         #
-        dt = 1.0 #start with 'fast' dt
+        dt = DT_START #start with 'fast' dt
         ni = 0
         while True:
             ni += 1
@@ -671,7 +677,7 @@ class path3D:
 
 
     def search(self,searchtype,dfile=None,nsamples=1000):
-        predict_timing(dfile, searchtype, nsamples)
+        predict_timing(dfile, searchtype,PCNAME, nsamples)
         #
         #  start timer
         ts1 = datetime.datetime.now()
@@ -1345,6 +1351,9 @@ def tests():
     print('   Cm tests:  PASSED')
 
     print('\n\n   Amax tests')
+    print('\n\n If this test fails, try a smaller value of DT_START (in ctoConfig.txt)\n')
+
+    print('DT_START: ',DT_START)
     print('AMAX: ',AMAX)
     for i in range(10):
         p1 = point3D(getcoord(random.randint(0,N**6-1)))
@@ -1383,12 +1392,12 @@ def tests():
     #  set up a df for search tests
     #
     df = bd.datafile('tests','BH','simulation')
-    df.set_folders('','')
-    df.metadata.d['Research Question'] = 'debug and test'
+    df.set_folders('/home/blake/Sync/Research/CalTrajOpt_RESULTS','')
+    df.metadata.d['ResearchQuestion'] = 'debug and test'
 
 
     print('search test 1:   sampling random paths')
-    searchtype = 'sampling'
+    searchtype = 'sampling search'
     bpath = path3D(c1)
     bpath.search(searchtype,dfile=df,nsamples=10)
 
