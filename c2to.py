@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 
 import socket
+import json
+import math
 import numpy as np
 import matplotlib.pyplot as plt
 import brl_data.brl_data as bd
@@ -87,50 +89,59 @@ def getcoord(idx):
         r = (r-v[5-i])//N
     return v
 
-def predict_timing(searchtype, nsamp):
-      #
-        # predict the search timing
-        #
-        OK = True
-        key = searchtype + '-' + PCNAME
-        if os.path.isfile('searchTiming.json'):
-            fd = open('searchTiming.json','r')
-            d = json.load(fd)
-            print('n samples:',nsamp)
-            try:
-                t = d[key]
-            except:
-                OK=False
-            if OK:
-                print('your predicted search time is:')
-                print('search type/PC:',key)
-                print('rate:          ',d[key],'/sec')
-                sec = float(d[key])*nsamp
-                mins = sec/60
-                hrs = mins/60
-                days = hrs/24
-                years = days/365
-                print('predicted time: ')
-                fmth='{:30} {:>12} {:>12} {:>12} {:>12}'
-                print(fmth.format('PC type','mins','hrs','days','years'))
-                fmts='{:30} {:12.2f} {:12.2f} {:12.2f} {:12.2f}'
-                print(fmts.format(key, mins,hrs,days,years))
-                if mins>2:
-                    x=input('OK to continue? ...')
-        else:
-            OK=False #path is not a file
-        if not OK:
-            print('no search speed info available for your configuration: ',key)
-            x=input('OK to continue? ...')
+def predict_timing(df, searchtype, nsamp):
+    #
+    # predict the search timing
+    #
+    savedir = ''
+    if df is not None:
+        savedir = df.folder
+    filename = savedir + 'searchTiming.json'
+    OK = True
+    key = searchtype + '-' + PCNAME
+    if os.path.isfile(filename):
+        fd = open(filename,'r')
+        d = json.load(fd)
+        print('n samples:',nsamp)
+        try:
+            t = d[key]
+        except:
+            OK=False
+        if OK:
+            print('your predicted search time is:')
+            print('search type/PC:',key)
+            print('rate:          ',d[key],'/sec')
+            sec = float(d[key])*nsamp
+            mins = sec/60
+            hrs = mins/60
+            days = hrs/24
+            years = days/365
+            print('predicted time: ')
+            fmth='{:30} {:>12} {:>12} {:>12} {:>12}'
+            print(fmth.format('PC type','mins','hrs','days','years'))
+            fmts='{:30} {:12.2f} {:12.2f} {:12.2f} {:12.2f}'
+            print(fmts.format(key, mins,hrs,days,years))
+            if mins>2:
+                x=input('OK to continue? ...')
+    else:
+        OK=False #path is not a file
+    if not OK:
+        print('no search speed info available for your configuration: ',key)
+        x=input('OK to continue? ...')
 
-def save_timing(searchname,systemName,rate):
-    if os.path.isfile('searchTiming.json'):
-        fd = open('searchTiming.json','r')
+def save_timing(df, searchname,systemName,rate):
+    savedir = ''
+    if df is not None:
+        savedir = df.folder
+    filename = savedir + 'searchTiming.json'
+    if os.path.isfile(filename):
+        fd = open(filename,'r')
         d = json.load(fd)
     else:
         d = {}
+    # add to the dict and resave
     d[searchname+'-'+systemName] = rate
-    fd = open('searchTiming.json','w')
+    fd = open(filename,'w')
     json.dump(d,fd,indent=4)
     return
 
@@ -660,14 +671,14 @@ class path3D:
 
 
     def search(self,searchtype,dfile=None,nsamples=1000):
-
-        predict_timing(searchtype, nsamples)
+        predict_timing(dfile, searchtype, nsamples)
         #
         #  start timer
         ts1 = datetime.datetime.now()
         #
         #  select the type of search to do
         #
+        self.searchtype = searchtype
         if searchtype.startswith('heur'):
             p, cmin = self.heuristicSearch()
         elif searchtype.startswith('multi'):
@@ -689,10 +700,11 @@ class path3D:
         dt = (ts2-ts1).total_seconds()
         print('seconds per {:} paths: {:}'.format(nsamples, float(dt)))
         print('seconds per path: {:}'.format(float(dt)/nsamples))
-        save_timing(searchtype,PCNAME,float(dt)/nsamples)
+        save_timing(dfile,searchtype,PCNAME,float(dt)/nsamples)
         return p,cmin
 
     def sampleSearch(self,dfile=None,nsamples=977):
+        print('Testing: sampling search, nsam:',nsamples)
         return self.bruteForce(dfile=dfile,sampling=True,nsamples=nsamples)
 
 
@@ -704,10 +716,10 @@ class path3D:
         if not sampling:
             error('theres NO way I can do full brute force in 6D!!!')
 
-        n_all_paths = math.factorial(N**6)
+        #n_all_paths = math.factorial(N**6)
         print('Starting {:} search: N={:}'.format(self.searchtype,N))
         if sampling:
-            print('   Sampling {:} paths out of {:12.5e}'.format(nsamples,float(n_all_paths)))
+            print('   Sampling {:} paths out of <humongous #>'.format(nsamples))
 
         LOWMEM = False
         if N>3 and not sampling:
@@ -771,7 +783,8 @@ class path3D:
         n = -1
         cmin = 99999999999
         cmax = 0
-        pmin = []
+        pmax = path3D(self.Cm)
+        pmin = path3D(self.Cm)
         for p in piter:  # piter returns list of point indices
             # p is the current path [idx0,idx1,idx2 ...]
             # now get the cost of p
@@ -797,14 +810,14 @@ class path3D:
                 df.write(row)
             if c > cmax:
                 cmax = c
-                pmax = path(self.grid,self.Cm)
                 pmax.path = tmpTrajList # list of trajectories
+                pmax.idxpath = idxpath
                 pmax.Tcost = c
                 nmax = n
             if c < cmin:
                 cmin = c
-                pmin = path(self.grid,self.Cm)
                 pmin.path = tmpTrajList
+                pmin.idxpath = idxpath
                 pmin.Tcost = c
                 nmin = n
             #print(' path cost: {:4.2f}'.format(c))
