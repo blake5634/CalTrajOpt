@@ -390,7 +390,7 @@ class path:
         #  select the type of search to do
         #
         if searchtype.startswith('heur'):
-            p, cmin = self.heuristicSearch(dfine,)
+            p, cmin = self.heuristicSearch()
         elif searchtype.startswith('multi'):
             if dfile is None:
                 error('path.search: multi heuristic search requires a dfile')
