@@ -945,6 +945,8 @@ class path3D:
             while len(self.path) < N**6 - 1:
                 search = search_from_curr_pt(mark,self)
                 search.pstart = pstart
+                search.minTrs=[] #these will get all branches matching cmin cost.
+                search.minidxs=[]
                 search.iterate(N,search.find_cmin)
                 search.iterate(N,search.find_all_cminTrs)
                 nxtidx,nxtTr = search.select_next()   # break a possible tie btwn branches leaving this pt.
@@ -1281,7 +1283,7 @@ class path3D:
 
 
 
-def tests():
+def main():
     import pickle
     import os
 
@@ -1396,15 +1398,15 @@ def tests():
     df.metadata.d['ResearchQuestion'] = 'debug and test'
 
 
-    print('search test 1:   sampling random paths')
+    print('\n\nsearch test 1:   sampling random paths')
     searchtype = 'sampling search'
     bpath = path3D(c1)
-    bpath.search(searchtype,dfile=df,nsamples=10)
+    bpath.search(searchtype,dfile=df,nsamples=10000)
 
 
     print('\n\n            ALL tests:     PASSED')
 
 if __name__ ==  '__main__':
     print('main starting:')
-    tests()
+    main()
 

@@ -12,11 +12,11 @@ import brl_data.brl_data as bd
 import matplotlib.pyplot as plt
 
 def main(args):
-    # some basics
-    cto.configure()
-    gr = cto.grid2D(cto.N)
-    Cm = cto.Cm()
-    Cm.fill(gr)
+    ## some basics
+    #cto.configure()
+    #gr = cto.grid2D(cto.N)
+    #Cm = cto.Cm()
+    #Cm.fill(gr)
     #####################################################################
     #
     # ask user for a hint so they don't have to enter a long filename
