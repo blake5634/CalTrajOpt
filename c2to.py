@@ -11,6 +11,7 @@ import sys
 import os
 import random
 
+
 def error(msg):
     print('Error: ')
     print(msg)
