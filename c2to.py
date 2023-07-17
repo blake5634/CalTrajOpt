@@ -11,6 +11,13 @@ import sys
 import os
 import random
 
+from pympler import asizeof
+
+def sizer(str,arg):
+    print(' ... click ...')
+    print('Sizeof: ',str, asizeof.asizeof(arg))
+
+
 
 def error(msg):
     print('Error: ')
@@ -73,19 +80,20 @@ def configure(fp=None):
             startcol = int(v)
 
 
-def ij2idx(i,j):
-    error('cant use ij2idx anymore with 6D search')
-    return i*N+j
+#def ij2idx(i,j):
+    #error('cant use ij2idx anymore with 6D search')
+    #return i*N+j
 
-def idx2ij(idx):
-    error('cant use idx2ij anymore with 6D search')
-    i = idx//N
-    j = idx-N*i
-    return i,j
+#def idx2ij(idx):
+    #error('cant use idx2ij anymore with 6D search')
+    #i = idx//N
+    #j = idx-N*i
+    #return i,j
 
 #  convert between 6D int coordiates and point index
 def getidx(v):
     return v[0]*N**5+v[1]*N**4+v[2]*N**3+v[3]*N**2+v[4]*N+v[5]
+
 def getcoord(idx):
     v = [0,0,0,0,0,0]
     r = idx
@@ -196,10 +204,6 @@ class point3D:
 
 class trajectory3D:
     def __init__(self,p1,p2):
-        ptest = point3D(getcoord(1234))
-        type3Dpt = str(type(ptest))
-        if str(type(p1)) != type3Dpt or str(type(p2)) != type3Dpt:
-            error('trajectory3D called with 1D point!')
         #print('trajectory3D: p1,p2: ',p1,p2)
         self.p1 = p1
         self.p2 = p2
@@ -359,7 +363,7 @@ class trajectory3D:
     def __repr__(self):
         return str(self.p1) + ' ---> ' + str(self.p2)
 
-class Cm:
+class Cm:  # save memory, Cm.m only contains cost pair ct,ce
     def __init__(self):
         if M>5000:
             error('too many transitions for Cm! ',M*M)
@@ -382,12 +386,12 @@ class Cm:
                 if (p1 == p2):
                     t.valid = False  # eliminate self transitions
                 else:
-                    t.compute(DT_TEST)
+                    #t.compute(DT_TEST)
                     t.constrain_A()
                     a = t.timeEvolution(ACC_ONLY=True)
-                    t.cost_e(a)
-                    t.cost_t(a)
-                self.m[i1][j1] = t
+                    ct = t.cost_e(a)
+                    ce = t.cost_t(a)
+                    self.m[i1][j1] = (ct,ce)  # new - save data size
         print('done with fill...')
 
     def __repr__(self):
@@ -401,7 +405,7 @@ class Cm:
 class search_from_curr_pt:
     def __init__(self,Mark,path):
         self.costtype = costtype # a global from config file
-        self.pstart = None  # last known trajectory point (or initial point)
+        self.pstartIdx = None  # last known trajectory point (or initial point)
         self.cmin   = 99999999999
         self.minidx = 0
         self.minTrs = []
@@ -422,16 +426,13 @@ class search_from_curr_pt:
                                     function(index,ivect)
 
     def find_cmin(self,index,ivect):  # should be called by iterate as first step.
-        if self.mark[index]:
-            if self.pstart is None:
+        if self.mark[index]: # index = Cm.m column
+            if self.pstartIdx is None:
                 error('find_cmin: start point unknown')
-            p1 = self.pstart
-            p2 = point3D(ivect)
-            if p1==p2:
-                p2.valid = False
-            if p2.valid:
-                tr = trajectory3D(p1,p2)
-                tc = self.eval_cost(tr)
+            p1idx = self.pstartIdx
+            p2idx = index
+            if p1!=p2:
+                tc = self.eval_cost(p1idx,p2idx)
                 if tc < self.cmin:
                     self.cmin   = tc
                     self.p2Cmin = tr.p2
@@ -439,13 +440,14 @@ class search_from_curr_pt:
                     self.minidx = index
                     self.found = True
 
-    def eval_cost(self,tr):
+    def eval_cost(self,i1,i2):
         if not tr.constrained:
             error('cant eval_cost b/c traj is not yet constrained')
+        tc,ec = self.Cm.m[i1][i2]
         if self.costtype == 'energy':
-            tc = tr.e_cost #precomputed
+            tc = ec #precomputed
         elif self.costtype == 'time':
-            tc = tr.t_cost # precomputed
+            tc = tc # precomputed
         else:
             error('search:set_costtype: unknown cost type (3D): '+costtype)
         return tc
@@ -489,10 +491,12 @@ class search_from_curr_pt:
 class path3D:
     def __init__(self,Cm):
         self.Cm = Cm      # cost matrix (actually trajectories)
+        sizer('path3D.Cm: ',self.Cm)
         self.sr = startrow
         self.sc = startcol
-        self.mark = [True for x in range(N**6)]
-        self.mark[self.sr*N+self.sc] = False # mark our starting point
+        self.mark = [True for x in range(N**6)]  # true if pt is UNvisited
+        sizer('path3D.mark: ',self.mark)
+        self.mark[self.sr*N+self.sc] = False # mark our starting point (can be overridden)
         self.Tcost = 0.0
         self.path = []  # the path as a list of trajectories
         self.idxpath = [] # the path as a list of indices (0..N**6)
@@ -500,7 +504,7 @@ class path3D:
         self.datafile = None
 
 
-    def search(self,searchtype,dfile=None,nsamples=1000):
+    def search(self,searchtype,dfile=None,nsamples=1000,profiler=None):
         predict_timing(dfile, searchtype,PCNAME, nsamples)
         #
         #  start timer
@@ -509,20 +513,32 @@ class path3D:
         #  select the type of search to do
         #
         self.searchtype = searchtype
+        #
+        #  single heuristic search (greedy nearest neighbor)
+        #
         if searchtype.startswith('heur'):
             p, cmin = self.heuristicSearch()
+        #
+        #  a population of heuristic searches
+        #
         elif searchtype.startswith('multi'):
             if dfile is None:
                 error('path.search: multi heuristic search requires a dfile')
-            p, cmin = self.multiHSearch(dfile,nsamples)
+            p, cmin = self.multiHSearch(dfile,nsamples, profiler=profiler)
+        #
+        #  a full brute force search over all paths
+        #
         elif searchtype.startswith('brute'):
             if dfile is None:
                 error('path.search: brute force search requires a dfile')
-            p, cmin = self.bruteForce(dfile=dfile)
+            p, cmin = self.bruteForce(dfile=dfile,profiler=profiler)
+        #
+        # a random sample of paths are cost-evaluated
+        #
         elif searchtype.startswith('sampling'):
             if dfile is None:
                 error('path.search: sampling search requires a dfile')
-            p, cmin = self.sampleSearch(dfile=dfile,nsamples=nsamples)
+            p, cmin = self.sampleSearch(dfile=dfile,nsamples=nsamples,profiler=profiler)
         else:
             error('path.search: unknown search type: ', searchtype)
         #report timing
@@ -533,12 +549,12 @@ class path3D:
         save_timing(dfile,searchtype,PCNAME,float(dt)/nsamples)
         return p,cmin
 
-    def sampleSearch(self,dfile=None,nsamples=977):
+    def sampleSearch(self,dfile=None,nsamples=977,profiler=None):
         print('Testing: sampling search, nsam:',nsamples)
-        return self.bruteForce(dfile=dfile,sampling=True,nsamples=nsamples)
+        return self.bruteForce(dfile=dfile,sampling=True,nsamples=nsamples,profiler=profiler)
 
 
-    def bruteForce(self,dfile=None,sampling=False,nsamples=0): # path class
+    def bruteForce(self,dfile=None,sampling=False,nsamples=0,profiler=None): # path class
         if self.searchtype.startswith('none'):
             self.searchtype = 'brute force'
             sampling = False
@@ -592,17 +608,19 @@ class path3D:
         print('We are generating {:} random paths through {:} nodes'.format(nsamples,N**6))
         piter = []
         phashset = set()
-        while len(phashset) < nsamples:
+        while len(piter) < nsamples: # make sure list has no dupes
             p = list(range(N**6))
             random.shuffle(p) # generate a path as random list of indices
             pthash = ''
-            for j in p:
-                pthash +='{:3d}'.format(j) # 'hash' the list
+            for pt in p:
+                pthash +='{:3d}'.format(pt) # 'hash' the point list
             if pthash not in phashset: # we've found a new pt
                 piter.append(p)
                 phashset.add(pthash)
 
-        print('Path enumeration complete:')
+        sizer('piter: ',piter)
+
+        print('Path enumeration complete (without duplicates):')
 
         # keep around for history
         #secPerLoop = 0.0003366 # measured on IntelNUC
@@ -614,8 +632,11 @@ class path3D:
         cmin = 99999999999
         cmax = 0
         pmax = path3D(self.Cm)
+        sizer('pmax1: ',pmax)
         pmin = path3D(self.Cm)
-        for p in piter:  # piter returns list of point indices
+        sizer('pmax2: ',pmax)
+        sizer('pmin: ',pmin)
+        for p in piter:  # piter iterates to a series of lists of point indices
             # p is the current path [idx0,idx1,idx2 ...]
             # now get the cost of p
             idxpath = list(p)
@@ -624,12 +645,12 @@ class path3D:
             tmpTrajList = []
             for i in range(len(idxpath)-1):
                 # build next trajectory
-                tr = self.Cm.m[idxpath[i]][idxpath[i+1]] #traj from current pt to next one
-                tmpTrajList.append(tr)
+                ct,ce = self.Cm.m[idxpath[i]][idxpath[i+1]] #traj from current pt to next one
+                #tmpTrajList.append(tr)
                 if costtype == 'energy':
-                    c += tr.e_cost
+                    c += ce
                 elif costtype == 'time':
-                    c += tr.t_cost
+                    c += ct
                 else:
                     error('unknown cost type: '+costtype)
             if n%2000 == 0:
@@ -653,13 +674,17 @@ class path3D:
             #print(' path cost: {:4.2f}'.format(c))
             if not LOWMEM:
                 path_costs.append(c)
-            #
-            #  we no longer need quartiles
-            #
-            print('Lowest cost path: ', pmin)
-            print('path cost: ', cmin)
-            print('Highest cost path: ', pmax)
-            print('path cost: ', cmax)
+            if nsamples < 100:  # too much clutter for big searches
+                print('{:} path cost: {:12.2f}'.format(n,c))
+                sizer('pmin: ',pmin)
+        #
+        #  we are done with the path set to be evaluated
+        #
+        print('{:} paths have been evaluated'.format(n))
+        print('Lowest cost path: ', pmin)
+        print('path cost: ', cmin)
+        print('Highest cost path: ', pmax)
+        print('path cost: ', cmax)
 
         if STOREDATA:
             df.metadata.d['Min Cost']=cmin
@@ -670,7 +695,7 @@ class path3D:
         return pmin, pmin.Tcost     # end of bruteforce
 
 
-    def multiHSearch(self,dfile,nsearch):
+    def multiHSearch(self,dfile,nsearch,profiler=None):
         ts1 = datetime.datetime.now()
         self.datafile = dfile #keep track of this for adding metadata
         df = dfile
@@ -745,7 +770,7 @@ class path3D:
         return pmin,pmin.Tcost
 
 
-    def heuristicSearch3D(self, idx1):
+    def heuristicSearch3D(self, idx1,profiler=None):
         ADVANCED = True
         BASIC = not ADVANCED  # where' just not going to do BASIC anymore
 
@@ -753,8 +778,7 @@ class path3D:
         if N**6 > 1.0E4:
             error('too big a search!!: '+float(N**6))
 
-        v1 = getidx(idx1)
-        pstart = point3D(v1)  # starting point (<N!)
+        pstartIdx = idx1  # starting point (<N!)
         self.mark = [True for x in range(N**6)]
         count = 0
         self.mark[idx1] = False # mark our starting point
@@ -768,7 +792,7 @@ class path3D:
             self.tie_freq = np.zeros(40)  # how many times you have n-way tie
             while len(self.path) < N**6 - 1:
                 search = search_from_curr_pt(mark,self)
-                search.pstart = pstart
+                search.pstartIdx = pstartIdx
                 search.minTrs=[] #these will get all branches matching cmin cost.
                 search.minidxs=[]
                 search.iterate(N,search.find_cmin)
@@ -776,7 +800,7 @@ class path3D:
                 nxtidx,nxtTr = search.select_next()   # break a possible tie btwn branches leaving this pt.
                 self.path.append(nxtTr)
                 plen += 1
-                pstart = nxtTr.p2
+                pstartIdx = nxtidx
                 self.Tcost += search.cmin
 
             print('Distribution of tie choices: (',len(self.path),' points in path)')
@@ -811,76 +835,7 @@ class path3D:
             return self, self.Tcost
 
         if BASIC:  # we're not doing basic anymore
-            self.Tcost = 0.0
-            self.path = []
-            plen = 0
-            while len(self.path) < N**6-1:
-                # start adding next point to path list
-                cmin = 99999999
-                found = False
-                # search costs through the available next points:
-                for ix in range(N):
-                    for iy in range(N):
-                        for iz in range(N):
-                            for idx in range(N):
-                                for idy in range(N):
-                                    for idz in range(N):
-                                        index = getidx([ix,iy,iz,idx,idy,idz])
-                                        if mark[index]:
-                                            p1 = pstart
-                                            p2 = point3D([ix,iy,iz,idx,idy,idz])
-                                            if p1==p2:
-                                                p2.valid = False
-                                            if p2.valid:
-                                                #
-                                                #  simple greedy search:
-                                                #       take the first min value encountered
-                                                #       (multiple points may have ~= cost
-                                                #
-                                                tr = trajectory3D(p1,p2)
-                                                tr.constrain_A()
-                                                if costtype == 'energy':
-                                                    a =  tr.timeEvolution(ACC_ONLY=True)
-                                                    tc = tr.cost_e(a)
-                                                elif costtype == 'time':
-                                                    tc = tr.cost_t()
-                                                else:
-                                                    error('unknown cost type (3D): '+costtype)
-                                                if tc < cmin:
-                                                    cmin = tc
-                                                    p2Cmin = p2
-                                                    trCmin = tr
-                                                    minidx = index
-                                                    found = True
-
-                # we've found lowest cost cmin and that point
-                #
-                # make sure though:
-                if not found:
-                    print('current index: ',index,'/', N**6)
-                    error('I didnt find a minimum cost!!'+ str(count))
-                if not mark[minidx]:
-                    error('new path point is marked already!')
-                if not p2.valid:
-                    print('current index: ',index,'/', N**6)
-                    error('path: trying to add invalid new point' + str(p2))
-                # future: go back and find all points with same cost as trCmin
-                if plen > 0:
-                    pprev = self.path[-1].p2
-                    pcurr = trCmin.p1
-                    if pprev != pcurr:
-                        print('minidx: ', minidx)
-                        print('adding traj: ', trCmin)
-                        error('path trajectories dont connect! '+str(pprev))
-                # we've passed all the checks: append the traj to path
-                print('adding: ', plen, trCmin.p2)
-                mark[minidx] = False  # do not visit this point again
-                self.path.append(trCmin)
-                plen += 1
-                pstart = p2Cmin
-                self.Tcost += cmin
-            print('BASIC Path search completed!')
-            print('Total path cost ({:}) = {:8.2f}: '.format(costtype,self.Tcost))
+            error("we're not doing BASIC mode anymore")
 
     def check(self): # 3D
         if len(self.path) != N**6-1:

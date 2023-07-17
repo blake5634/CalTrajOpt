@@ -14,6 +14,7 @@ import brl_data.brl_data as bd
 #import matplotlib.pyplot as plt
 
 from pympler.classtracker import ClassTracker
+from pympler import asizeof
 
 ##class MemStats(Stats):
 #class MemStats:
@@ -39,7 +40,6 @@ from pympler.classtracker import ClassTracker
 #tracker.create_snapshot()
 #tracker.stats.print_summary()
 
-
 tracker = ClassTracker()
 def start_tracker(classes):
     for c in classes:
@@ -56,7 +56,7 @@ def main(args):
 
     #prof
     #start_tracker([cto.Cm, cto.point3D,cto.path3D,bd.datafile])
-    start_tracker([cto.search_from_curr_pt])
+    start_tracker([cto.search_from_curr_pt,cto.path3D])
 
     # create a path and plot it graphically
     cto.configure()
@@ -110,16 +110,16 @@ def main(args):
     searchType = 'sampling search'
 
     nsamp = cto.N**6  # at least one for each starting point(!)
-    nsamp = 10 # 1M
+    nsamp = 2 # 1M
 
     #
     ###########################################################
 
 
-    p.search(searchType,dfile=df,nsamples=nsamp)
+    p.search(searchType,dfile=df,nsamples=nsamp,profiler=mem_snap)
 
     #prof
-    mem_snap('complete the search')
+    mem_snap('completed the search')
 
     # is it a valid path?
     #p.check()
