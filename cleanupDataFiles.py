@@ -41,13 +41,25 @@ def main(args):
             df.open(mode='r',tname=mdname)
             df.metadata.polish()  # convert metadata from strings to useful types
             df.close()
+            noQ = False
             try:
+                q = df.metadata.d['Research Question']
+                if len(q)==0 or 'debug' in df.metadata.d['Research Question'].lower():
+                    print('deletable Research Q:',q)
+                    remlist.append(fnr+'_meta.json')
+                    remlist.append(fnr+'.csv')
+            except:
+                noQ = True
+            try:
+                noQ = False
                 q = df.metadata.d['ResearchQuestion']
                 if len(q)==0 or 'debug' in df.metadata.d['ResearchQuestion'].lower():
                     print('deletable Research Q:',q)
                     remlist.append(fnr+'_meta.json')
                     remlist.append(fnr+'.csv')
             except:
+                noQ = True
+            if noQ:
                 print('failed to access research question (old files)', fnr)
         else:
             print('non existent metadata file: ',fnr)

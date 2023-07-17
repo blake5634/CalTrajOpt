@@ -1,8 +1,8 @@
 # path search parameters
-#costtype time
-costtype energy
-N        3
+costtype time
+#costtype energy
+N          3
 amax       2
-NPC     10
+NPC       10
 startrow   7
 startcol   7

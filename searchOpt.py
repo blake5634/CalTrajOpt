@@ -16,41 +16,21 @@ import brl_data.brl_data as bd
 from pympler.classtracker import ClassTracker
 from pympler import asizeof
 
-##class MemStats(Stats):
-#class MemStats:
-    #def __init__(self):
-        ##Stats.__init__(self)
-        #classes = [cto.Cm,cto.point3D,cto.path3D,bd.datafile]
-        #self.tracker = ClassTracker()
-        #for c in classes:
-            #self.tracker.track_class(c)
-    #def do_append(self, label):
-        #self.tracker.create_snapshot(label)
-    #def do_print(self):
-        #stats = self.tracker.stats
-        #stats.print_summary()
-        #stats.dump_stats('pympler.stats')
-
-## example 2
-#tracker = ClassTracker()
-#tracker.track_object(factory)
-#tracker.track_class(Employee)
-#tracker.create_snapshot()
-#populate_factory(factory)
-#tracker.create_snapshot()
-#tracker.stats.print_summary()
-
 tracker = ClassTracker()
 def start_tracker(classes):
-    for c in classes:
-        tracker.track_class(c,resolution_level=2)
+    pass
+    # commenting these out for speed
+    #for c in classes:
+        #tracker.track_class(c,resolution_level=2)
 
 def mem_snap(str):
     print(' ... click ...')
-    tracker.create_snapshot(str)
-    print('Memsnap: ',str)
+    #tracker.create_snapshot(str)  # comment out for speed
+    #print('Memsnap: ',str)
+
 def mem_report():
-    tracker.stats.print_summary()
+    pass
+    #tracker.stats.print_summary()
 
 def main(args):
 
@@ -109,8 +89,8 @@ def main(args):
     #searchType = 'multi heuristic'
     searchType = 'sampling search'
 
-    nsamp = cto.N**6  # at least one for each starting point(!)
-    nsamp = 2 # 1M
+    nsamp = 10*cto.N**6  # at least one for each starting point(!)
+    #nsamp = N**6 # 1M
 
     #
     ###########################################################

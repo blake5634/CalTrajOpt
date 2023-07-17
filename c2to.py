@@ -15,7 +15,7 @@ from pympler import asizeof
 
 def sizer(str,arg):
     print(' ... click ...')
-    print('Sizeof: ',str, asizeof.asizeof(arg))
+    #print('Sizeof: ',str, asizeof.asizeof(arg))
 
 
 
@@ -389,8 +389,8 @@ class Cm:  # save memory, Cm.m only contains cost pair ct,ce
                     #t.compute(DT_TEST)
                     t.constrain_A()
                     a = t.timeEvolution(ACC_ONLY=True)
-                    ct = t.cost_e(a)
-                    ce = t.cost_t(a)
+                    ce = t.cost_e(a)
+                    ct = t.cost_t(a)
                     self.m[i1][j1] = (ct,ce)  # new - save data size
         print('done with fill...')
 
