@@ -43,7 +43,7 @@ from pympler.classtracker import ClassTracker
 tracker = ClassTracker()
 def start_tracker(classes):
     for c in classes:
-        tracker.track_class(c)
+        tracker.track_class(c,resolution_level=2)
 
 def mem_snap(str):
     print(' ... click ...')
@@ -55,7 +55,8 @@ def mem_report():
 def main(args):
 
     #prof
-    start_tracker([cto.Cm, cto.point3D,cto.path3D,bd.datafile])
+    #start_tracker([cto.Cm, cto.point3D,cto.path3D,bd.datafile])
+    start_tracker([cto.search_from_curr_pt])
 
     # create a path and plot it graphically
     cto.configure()
@@ -65,6 +66,8 @@ def main(args):
 
     #prof
     mem_snap('create Cm')
+
+    q = input('Enter your research question: ')
 
     pname = 'c1Costs.pickle'
     if os.path.exists(pname):
@@ -88,8 +91,6 @@ def main(args):
     p = cto.path3D(c1)
 
 
-
-    q = input('Enter your research question: ')
 
     #prof
     mem_snap('created path3D()')
