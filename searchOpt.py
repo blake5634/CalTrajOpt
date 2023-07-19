@@ -85,12 +85,17 @@ def main(args):
     mem_snap('created datafile')
     ##########################################################
     #
+    # 1D only
+    searchtype = 'brute force'
+    # 4x4 and 6D:
+    searchType = 'multi heuristic'
+    #searchType = 'sampling search'
 
-    #searchType = 'multi heuristic'
-    searchType = 'sampling search'
-
-    nsamp = 10*cto.N**6  # at least one for each starting point(!)
+    # approx 1M samples
+    nsamp = 4*cto.N**6  # at least one for each starting point(!)
     #nsamp = N**6 # 1M
+
+    #nsamp = 3 # for testing
 
     #
     ###########################################################
@@ -107,6 +112,7 @@ def main(args):
     #prof
     mem_report()
 
+    print('Completed: see results at ',df.hashcode)
 
     # graph the path
     #p.plot(idx)

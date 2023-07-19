@@ -411,6 +411,7 @@ class search_from_curr_pt:
         self.minTrs = []
         self.minidxs = []
         self.found = False
+        self.ties = None   # number of ties found in this set of branches
         self.mark = Mark  # array to mark already chosen pts (True == still available)
         self.path = path
 
@@ -431,19 +432,15 @@ class search_from_curr_pt:
                 error('find_cmin: start point unknown')
             p1idx = self.pstartIdx
             p2idx = index
-            if p1!=p2:
+            if p1idx != p2idx:
                 tc = self.eval_cost(p1idx,p2idx)
                 if tc < self.cmin:
                     self.cmin   = tc
-                    self.p2Cmin = tr.p2
-                    self.trCmin = tr
                     self.minidx = index
                     self.found = True
 
     def eval_cost(self,i1,i2):
-        if not tr.constrained:
-            error('cant eval_cost b/c traj is not yet constrained')
-        tc,ec = self.Cm.m[i1][i2]
+        tc,ec = self.path.Cm.m[i1][i2]
         if self.costtype == 'energy':
             tc = ec #precomputed
         elif self.costtype == 'time':
@@ -467,10 +464,8 @@ class search_from_curr_pt:
         self.path.tie_freq[L] += 1  # count how many ties with each multiplicity L
         # pick one at random
         #print('select_next: choosing a random min traj! from ',len(self.minidxs))
-        tr = random.choice(self.minTrs)   # next traj itself
-        if not tr.computed or not tr.constrained:
-            error('select_next: trajectory is not comp or const.')
         ti = random.choice(self.minidxs) # index of next traj
+        tr = trajectory3D(point3D(getcoord(self.pstartIdx)),point3D(getcoord(ti)))
         self.mark[ti] = False
         return ti,tr #chosen next traj index, chosen next traj trajectory
 
@@ -479,14 +474,14 @@ class search_from_curr_pt:
             error('search.find_all_cminTrs: somethings wrong, need to find_cmin before find_all')
         epsilon = self.cmin * 0.02 # define 'close'
         if self.mark[index]:
-            tr = self.path.Cm.m[v[0]][v[1]][v[2]][v[3]][v[4]][v[5]]
-            tc = self.eval_cost(tr)
+            tc = self.eval_cost(self.pstartIdx,index)
+            tr = trajectory3D(point3D(getcoord(self.pstartIdx)),point3D(getcoord(index)))
             if abs(tc-self.cmin) < epsilon:
                 self.minTrs.append(tr)
                 self.minidxs.append(index)
         if len(self.minTrs) > self.path.nmin_max:
             self.path.nmin_max = len(self.minTrs)
-
+        self.ties = len(self.minidxs)
 
 class path3D:
     def __init__(self,Cm):
@@ -502,7 +497,9 @@ class path3D:
         self.idxpath = [] # the path as a list of indices (0..N**6)
         self.searchtype = 'none yet'
         self.datafile = None
-
+        self.maxTiesHSearch = -99999999  # most ties when greedy searching
+        self.tie_freq = np.zeros(100)  # histogram of how many ties of each length
+        self.ties = 0
 
     def search(self,searchtype,dfile=None,nsamples=1000,profiler=None):
         predict_timing(dfile, searchtype,PCNAME, nsamples)
@@ -606,17 +603,21 @@ class path3D:
             error(' we already checked this !!!')
 
         print('We are generating {:} random paths through {:} nodes'.format(nsamples,N**6))
+        phset = set()
         piter = []
-        phashset = set()
-        while len(piter) < nsamples: # make sure list has no dupes
+        n = 0
+        while n < nsamples: # make sure list has no dupes
+            if n%10000 == 0:
+                print(n,' paths')
             p = list(range(N**6))
             random.shuffle(p) # generate a path as random list of indices
-            pthash = ''
-            for pt in p:
-                pthash +='{:3d}'.format(pt) # 'hash' the point list
-            if pthash not in phashset: # we've found a new pt
+            ph = ''
+            for i in range(50):
+                ph += str(p[i])[-1] # last digit of idx
+            if ph not in phset: # we've found a new pt
+                phset.add(ph)
                 piter.append(p)
-                phashset.add(pthash)
+                n+=1 # count adds (faster than len()??)
 
         sizer('piter: ',piter)
 
@@ -725,50 +726,92 @@ class path3D:
         cmin = 99999999999
         cmax = 0
         maxTies = 0
-        nperstart = nsearch//(N**6)
+        if nsearch > N**6:
+            nperstart = nsearch//N**6
+            USESTPT = True
+        else:
+            nperstart = nsearch
+            USESTPT = False
         for i in range(N**6): # go through the start pts
-            if i%2000==0:
-                print('multiple heuristic searches: ',i)  #I'm alive
+            if USESTPT:
+                if i%2000==0:
+                    print('multiple heuristic searches: ',i)  #I'm alive
+            else:
+                print('searching starting point:',i)
             # go through the N^2 start points with equal number at each
             startPtIdx = i
             for m in range(nperstart): # do each start pt this many times
                 # reset search info
+                print('        iteration  ',m,'/',nperstart,'  for starting point',i)
                 self.mark = [True for x in range(N**6)]
                 count = 0
+                if not USESTPT:
+                    # a random start point
+                    startPtIdx = random.randint(0,N**6-1)
+
                 self.mark[startPtIdx] = False # mark our starting point
                 self.Tcost = 0.0
 
                 # do the search
                 pself,c = self.heuristicSearch3D(startPtIdx) #including random tie breakers
-
-                if pself.maxTiesHSearch > maxTies:
-                    maxTies = pself.maxTiesHSearch
-                datarow = pself.idxpath
+                print('compl 1 heuristicSearch3D: cost:',c)
+                if maxTies < pself.ties:
+                    maxTies = pself.ties
+                #
+                datarow = pself.idxpath  # ********
+                #
                 #print('my path: ',datarow)
                 datarow.append(c) # last col is cost
                 df.write(datarow)
                 if c < cmin: # find lowest cost of the runs
                     cmin=c
-                    pmin = path(self.grid,self.Cm)
+                    pmin = path3D(self.Cm)
                     pmin.path = pself.path
                     pmin.Tcost = c
                 if c > cmax: # find highest cost
                     cmax = c
-                    pmax = path(self.grid,self.Cm)
+                    pmax = path3D(self.Cm)
                     pmax.path = self.path
                     pmax.Tcost = c
+            if not USESTPT:
+                break
         df.metadata.d['Min Cost']=cmin
         df.metadata.d['Max Cost']=cmax
-        df.metadata.d['Max Ties']=maxTies
+        df.metadata.d['Max Ties']=self.maxTiesHSearch
         print('Lowest cost path: ', pmin)
         print('path cost: ', cmin)
         print('Highest cost path: ', pmax)
         print('path cost: ', cmax)
-        print('Max # of ties: ',maxTies)
+        print('Max # of ties: ',self.maxTiesHSearch)
+        MULTIHISTO = True
+        if MULTIHISTO:
+            print('Distribution of tie choices: (',len(self.path),' points in path)')
+            print('\n  tie rank    |  how many times')
+            print('----------------------------------------')
+            sum = 0
+            medianflag = True
+            fmtstring1 = '{:8d}     |     {:8d} '
+            fmtstring2 = '{:8d}     |     {:8d} << median'
+            median=0
+            for i,n in enumerate(self.tie_freq):
+                median += n
+            median /=2
+            df.metadata.d['Median Ties']=median
+            for i,n in enumerate(self.tie_freq):
+                sum += int(n)
+                if sum < median and medianflag :
+                    fmt = fmtstring1
+                elif medianflag:
+                    fmt = fmtstring2
+                    medianflag = False
+                else:
+                    fmt = fmtstring1
+                print(fmt.format(i,int(n)))
+
+
         df.close()
         # return path object, float
         return pmin,pmin.Tcost
-
 
     def heuristicSearch3D(self, idx1,profiler=None):
         ADVANCED = True
@@ -787,48 +830,53 @@ class path3D:
         if ADVANCED:
             self.Tcost = 0.0
             self.path = []
+            self.idxpath = []
             plen = 0
             self.nmin_max = 0
-            self.tie_freq = np.zeros(40)  # how many times you have n-way tie
             while len(self.path) < N**6 - 1:
-                search = search_from_curr_pt(mark,self)
+                search = search_from_curr_pt(self.mark,self)
                 search.pstartIdx = pstartIdx
                 search.minTrs=[] #these will get all branches matching cmin cost.
                 search.minidxs=[]
                 search.iterate(N,search.find_cmin)
                 search.iterate(N,search.find_all_cminTrs)
+                if search.ties > self.maxTiesHSearch:
+                    self.maxTiesHSearch = search.ties
                 nxtidx,nxtTr = search.select_next()   # break a possible tie btwn branches leaving this pt.
                 self.path.append(nxtTr)
+                self.idxpath.append(nxtidx)
                 plen += 1
                 pstartIdx = nxtidx
                 self.Tcost += search.cmin
 
-            print('Distribution of tie choices: (',len(self.path),' points in path)')
-            print('  tie rank    |  how many times')
-            print('\n----------------------------------------')
-            sum = 0
-            medianflag = True
-            fmtstring1 = '{:8d}     |     {:8d} '
-            fmtstring2 = '{:8d}     |     {:8d} << median'
-            median=0
-            for i,n in enumerate(self.tie_freq):
-                median += n
-            median /=2
+            REPORTHISTO = False
+            if REPORTHISTO:
+                print('Distribution of tie choices: (',len(self.path),' points in path)')
+                print('\n  tie rank    |  how many times')
+                print('----------------------------------------')
+                sum = 0
+                medianflag = True
+                fmtstring1 = '{:8d}     |     {:8d} '
+                fmtstring2 = '{:8d}     |     {:8d} << median'
+                median=0
+                for i,n in enumerate(self.tie_freq):
+                    median += n
+                median /=2
 
-            for i,n in enumerate(self.tie_freq):
-                sum += int(n)
-                if sum < median and medianflag :
-                    fmt = fmtstring1
-                elif medianflag:
-                    fmt = fmtstring2
-                    medianflag = False
-                else:
-                    fmt = fmtstring1
-                print(fmt.format(i,int(n)))
+                for i,n in enumerate(self.tie_freq):
+                    sum += int(n)
+                    if sum < median and medianflag :
+                        fmt = fmtstring1
+                    elif medianflag:
+                        fmt = fmtstring2
+                        medianflag = False
+                    else:
+                        fmt = fmtstring1
+                    print(fmt.format(i,int(n)))
 
 
-            print('')
-            print('\n\n       The longest set of min-cost next points was: {:} points\n\n'.format(self.nmin_max))
+                print('')
+                print('\n\n       The longest set of min-cost next points was: {:} points\n\n'.format(self.nmin_max))
             print('ADVANCED Path search completed!')
             print('Total path cost ({:}) = {:8.2f}: '.format(costtype,self.Tcost))
             # return path object, float

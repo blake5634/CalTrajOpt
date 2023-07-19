@@ -1,6 +1,6 @@
 # path search parameters
-costtype time
-#costtype energy
+#costtype time
+costtype energy
 N          3
 amax       2
 NPC       10
