@@ -8,3 +8,10 @@
 2023-07-11 14:06:11, cc71bef2, multi heuristic, cost: 19.24 (energy),  RQ: 4x4 grid 1M heurstic energy cost
 2023-07-11 14:13:38, f0f45ab5, multi heuristic, cost: 11.03 (time),  RQ: 4x4x1MgreedySearch distrb for time cost
 2023-07-13 12:50:21, f8372f38, sampling search, cost: 8.77 (time),  RQ: redo of 29e83f59: 3x3 10% sampled time cost
+2023-07-21 07:39:34, ddbecba7, multi heuristic, cost: 765.01 (energy),  RQ: 
+2023-07-21 07:42:59, 8def3fe8, multi heuristic, n=3, 6D, cost: 762.04 (energy),  RQ: 
+2023-07-21 09:33:28, 6040311c, multi heuristic, n=2916, 6D, cost: 2217.34 (time),  RQ: 4x729x6D rand samp time cost
+2023-07-21 09:44:12, 7f2e5815, sampling search, n=2916, 6D, cost: 9254.26 (time),  RQ: 4x729x6D Samp search, time cost
+2023-07-21 10:55:18, plot: plot: /home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/4x729HsrchVsSamplesrchDistrosOverplot_657c_b393_b393d7dd.png 657c0684 b393d7dd
+2023-07-21 12:50:19, plot saved: /home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/_657c0684_b393d7dd.png 657c0684 b393d7dd
+2023-07-21 12:52:26, plot saved: /home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/_657c0684_b393d7dd.png 657c0684 b393d7dd

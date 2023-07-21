@@ -39,7 +39,7 @@ def main(args):
             df = bd.datafile('', '','')  # open it with blank title info
             df.set_folders(datadir,'')        # set these to wherever you want to open datafiles
             df.open(mode='r',tname=mdname)
-            df.metadata.polish()  # convert metadata from strings to useful types
+            #df.metadata.polish()  # convert metadata from strings to useful types
             df.close()
             noQ = False
             try:
