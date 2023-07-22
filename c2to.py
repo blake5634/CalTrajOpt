@@ -6,7 +6,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import brl_data.brl_data as bd
-import datetime
+import datetime as dt
 import sys
 import os
 import random
@@ -160,6 +160,25 @@ def save_timing(df, searchtype, systemName,rate):
     json.dump(d,fd,indent=4)
     return
 
+def plotSave(fig, dpi, imagedir, imagename):
+    #fig = plt.gcf()
+    #datad = string path to data directory
+    if imagedir[-1] != '/':
+        imagedir += '/'
+    imagepath = imagedir+imagename+'.png'
+    fig.savefig(imagepath,dpi=dpi)
+    print('your plot is saved to: ',imagepath)
+
+    ####  keep a "log book" if saved
+    dim = '6D'
+    notes = '{:}, {:}'.format(dim,imagepath)
+    now = dt.datetime.now()
+    dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
+    logentry = '{:}, plot saved: {:}'.format(dtstring,notes)
+    f =open('search_logbook.txt','a')
+    print(logentry,file=f)
+    f.close()
+    ####
 
 class point3D:
 
@@ -363,6 +382,23 @@ class trajectory3D:
     def __repr__(self):
         return str(self.p1) + ' ---> ' + str(self.p2)
 
+def cost_idxp(typestr, Cm, idxpath):   # compute total cost from a list of indeces
+    L = len(idxpath)-1
+    if L != N**6-1:
+        error('not a correct length path!: '+str(L))
+    Tc = 0.0
+    for i in range(L):
+        i1 = idxpath[i]
+        i2 = idxpath[i+1]
+        ct,ce = Cm.m[i1][i2]
+        if typestr == 'energy':
+            Tc += ce
+        elif typestr == 'time':
+            Tc += ct
+        else:
+            error('cost_idxp: unknown cost type: '+typestr)
+    return Tc
+
 class Cm:  # save memory, Cm.m only contains cost pair ct,ce
     def __init__(self):
         if M>5000:
@@ -450,7 +486,7 @@ class search_from_curr_pt:
         return tc
 
     def select_next(self):
-        L = len(self.minTrs)
+        L = len(self.minidxs)
 
         #error condition checks
         if L != len(self.minidxs):
@@ -460,7 +496,8 @@ class search_from_curr_pt:
         if L == 1:
             self.mark[self.minidx] = False
             return self.minidx, self.minTrs[0]
-
+        if L > MAXTIEHISTO-1:  # pile all bigger ties into last bin
+            L = MAXTIEHISTO-1
         self.path.tie_freq[L] += 1  # count how many ties with each multiplicity L
         # pick one at random
         #print('select_next: choosing a random min traj! from ',len(self.minidxs))
@@ -474,14 +511,16 @@ class search_from_curr_pt:
             error('search.find_all_cminTrs: somethings wrong, need to find_cmin before find_all')
         epsilon = self.cmin * 0.02 # define 'close'
         if self.mark[index]:
-            tc = self.eval_cost(self.pstartIdx,index)
+            tc = self.eval_cost(self.pstartIdx,index)  # get cost for this branch
             tr = trajectory3D(point3D(getcoord(self.pstartIdx)),point3D(getcoord(index)))
             if abs(tc-self.cmin) < epsilon:
                 self.minTrs.append(tr)
                 self.minidxs.append(index)
         if len(self.minTrs) > self.path.nmin_max:
             self.path.nmin_max = len(self.minTrs)
-        self.ties = len(self.minidxs)
+        self.ties = len(self.minidxs) #how many ties at this node??
+
+MAXTIEHISTO = 100  # how many bins for the tie frequency histogram
 
 class path3D:
     def __init__(self,Cm):
@@ -498,14 +537,14 @@ class path3D:
         self.searchtype = 'none yet'
         self.datafile = None
         self.maxTiesHSearch = -99999999  # most ties when greedy searching
-        self.tie_freq = np.zeros(100)  # histogram of how many ties of each length
+        self.tie_freq = np.zeros(MAXTIEHISTO)  # histogram of how many ties of each length
         self.ties = 0
 
     def search(self,searchtype,dfile=None,nsamples=1000,profiler=None):
         predict_timing(dfile, searchtype,PCNAME, nsamples)
         #
         #  start timer
-        ts1 = datetime.datetime.now()
+        ts1 = dt.datetime.now()
         #
         #  select the type of search to do
         #
@@ -539,7 +578,7 @@ class path3D:
         else:
             error('path.search: unknown search type: ', searchtype)
         #report timing
-        ts2 = datetime.datetime.now()
+        ts2 = dt.datetime.now()
         dt = (ts2-ts1).total_seconds()
         print('seconds per {:} paths: {:}'.format(nsamples, float(dt)))
         print('seconds per path: {:}'.format(float(dt)/nsamples))
@@ -641,19 +680,7 @@ class path3D:
             # p is the current path [idx0,idx1,idx2 ...]
             # now get the cost of p
             idxpath = list(p)
-            n += 1
-            c = 0.0 #accumulate cost along path
-            tmpTrajList = []
-            for i in range(len(idxpath)-1):
-                # build next trajectory
-                ct,ce = self.Cm.m[idxpath[i]][idxpath[i+1]] #traj from current pt to next one
-                #tmpTrajList.append(tr)
-                if costtype == 'energy':
-                    c += ce
-                elif costtype == 'time':
-                    c += ct
-                else:
-                    error('unknown cost type: '+costtype)
+            c = cost_idxp(costtype, self.Cm, idxpath)  #what is cost of this path?
             if n%2000 == 0:
                     print('path ',n) # I'm alive!
             if STOREDATA:
@@ -662,13 +689,13 @@ class path3D:
                 df.write(row)
             if c > cmax:
                 cmax = c
-                pmax.path = tmpTrajList # list of trajectories
+                #pmax.path = tmpTrajList # list of trajectories
                 pmax.idxpath = idxpath
                 pmax.Tcost = c
                 nmax = n
             if c < cmin:
                 cmin = c
-                pmin.path = tmpTrajList
+                #pmin.path = tmpTrajList
                 pmin.idxpath = idxpath
                 pmin.Tcost = c
                 nmin = n
@@ -697,7 +724,7 @@ class path3D:
 
 
     def multiHSearch(self,dfile,nsearch,profiler=None):
-        ts1 = datetime.datetime.now()
+        ts1 = dt.datetime.now()
         self.datafile = dfile #keep track of this for adding metadata
         df = dfile
         print('Saving permutations (paths) to: ',df.name)
@@ -726,11 +753,11 @@ class path3D:
         cmin = 99999999999
         cmax = 0
         maxTies = 0
-        if nsearch > N**6:
+        if nsearch > N**6:  # for big enough searches, allocate same # to all start points
             nperstart = nsearch//N**6
             USESTPT = True
         else:
-            nperstart = nsearch
+            nperstart = nsearch   # if less, just pick random start points
             USESTPT = False
         for i in range(N**6): # go through the start pts
             if USESTPT:
@@ -749,12 +776,12 @@ class path3D:
                     # a random start point
                     startPtIdx = random.randint(0,N**6-1)
 
+                # don't think we need these acth
                 self.mark[startPtIdx] = False # mark our starting point
                 self.Tcost = 0.0
 
                 # do the search
                 pself,c = self.heuristicSearch3D(startPtIdx) #including random tie breakers
-                print('compl 1 heuristicSearch3D: cost:',c)
                 if maxTies < pself.ties:
                     maxTies = pself.ties
                 #
@@ -785,9 +812,11 @@ class path3D:
         print('Max # of ties: ',self.maxTiesHSearch)
         MULTIHISTO = True
         if MULTIHISTO:
-            print('Distribution of tie choices: (',len(self.path),' points in path)')
-            print('\n  tie rank    |  how many times')
-            print('----------------------------------------')
+            fname = 'ties_info_'+ df.hashcode+'.txt'
+            fp = open (fname, 'w')
+            print('Distribution of tie choices: (',len(self.path),' points in path)',file=fp)
+            print('\n  tie rank    |  how many times',file=fp)
+            print('----------------------------------------',file=fp)
             sum = 0
             medianflag = True
             fmtstring1 = '{:8d}     |     {:8d} '
@@ -806,8 +835,8 @@ class path3D:
                     medianflag = False
                 else:
                     fmt = fmtstring1
-                print(fmt.format(i,int(n)))
-
+                print(fmt.format(i,int(n)),file=fp)
+            fp.close()
 
         df.close()
         # return path object, float
@@ -830,8 +859,7 @@ class path3D:
         if ADVANCED:
             self.Tcost = 0.0
             self.path = []
-            self.idxpath = []
-            plen = 0
+            self.idxpath = [pstartIdx] # path has a start point
             self.nmin_max = 0
             while len(self.path) < N**6 - 1:
                 search = search_from_curr_pt(self.mark,self)
@@ -840,45 +868,43 @@ class path3D:
                 search.minidxs=[]
                 search.iterate(N,search.find_cmin)
                 search.iterate(N,search.find_all_cminTrs)
-                if search.ties > self.maxTiesHSearch:
+                if search.ties > self.maxTiesHSearch:  # keep track of greatest number of ties along this path
                     self.maxTiesHSearch = search.ties
                 nxtidx,nxtTr = search.select_next()   # break a possible tie btwn branches leaving this pt.
                 self.path.append(nxtTr)
                 self.idxpath.append(nxtidx)
-                plen += 1
                 pstartIdx = nxtidx
-                self.Tcost += search.cmin
+                #self.Tcost += search.cmin
+            self.Tcost = cost_idxp(costtype,self.Cm, self.idxpath)  # compute total cost of the path
 
             REPORTHISTO = False
-            if REPORTHISTO:
-                print('Distribution of tie choices: (',len(self.path),' points in path)')
-                print('\n  tie rank    |  how many times')
-                print('----------------------------------------')
-                sum = 0
-                medianflag = True
-                fmtstring1 = '{:8d}     |     {:8d} '
-                fmtstring2 = '{:8d}     |     {:8d} << median'
-                median=0
-                for i,n in enumerate(self.tie_freq):
-                    median += n
-                median /=2
+            #if REPORTHISTO:
+                #print('Distribution of tie choices: (',len(self.path),' points in path)')
+                #print('\n  tie rank    |  how many times')
+                #print('----------------------------------------')
+                #sum = 0
+                #medianflag = True
+                #fmtstring1 = '{:8d}     |     {:8d} '
+                #fmtstring2 = '{:8d}     |     {:8d} << median'
+                #median=0
+                #for i,n in enumerate(self.tie_freq):
+                    #median += n
+                #median /=2
 
-                for i,n in enumerate(self.tie_freq):
-                    sum += int(n)
-                    if sum < median and medianflag :
-                        fmt = fmtstring1
-                    elif medianflag:
-                        fmt = fmtstring2
-                        medianflag = False
-                    else:
-                        fmt = fmtstring1
-                    print(fmt.format(i,int(n)))
-
-
-                print('')
-                print('\n\n       The longest set of min-cost next points was: {:} points\n\n'.format(self.nmin_max))
-            print('ADVANCED Path search completed!')
-            print('Total path cost ({:}) = {:8.2f}: '.format(costtype,self.Tcost))
+                #for i,n in enumerate(self.tie_freq):
+                    #sum += int(n)
+                    #if sum < median and medianflag :
+                        #fmt = fmtstring1
+                    #elif medianflag:
+                        #fmt = fmtstring2
+                        #medianflag = False
+                    #else:
+                        #fmt = fmtstring1
+                    #print(fmt.format(i,int(n)))
+                #print('')
+                #print('\n\n       The longest set of min-cost next points was: {:} points\n\n'.format(self.nmin_max))
+            print('heuristic path search completed!')
+            print('{:} Total path cost ({:}) = {:8.2f}: '.format(self.searchtype,costtype,self.Tcost))
             # return path object, float
             return self, self.Tcost
 

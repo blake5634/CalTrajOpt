@@ -56,7 +56,7 @@ def main(args):
     #  OK - now lets create a datafile and open it for reading
     #
     mds = [{},{}]
-    hashs = ['x','x']
+    hs = ['x','x']
     for ip, dfname in enumerate([dfname1, dfname2]):
         print('opening ', dfname)
         df = bd.datafile('', '','')  # open it with blank title info
@@ -103,35 +103,26 @@ def main(args):
             #c2[i] *= scale
         plt.plot(xs[ip],curve)
     plt.title('{:} cost distributions'.format(costtype))
-    plt.xlabel('Cost      ({:},{:})'.format(hashs[0],hashs[1]))
+    plt.xlabel('Cost      ({:},{:})'.format(hs[0],hs[1]))
     plt.ylabel('# paths')
     plt.tight_layout() # make sure stuff shows with custom dimensions
     figure = plt.gcf()
     plt.show()
 
-    template = '______________'+hashs[0]+'_'+hashs[1]+'.png'
+    template = '______________'+hs[0]+'_'+hs[1]+'.png'
     print('filename template: ',template)
     nroot = input('enter name root: (<enter> to not save) ')
     if len(nroot)>0:
+        h0 = hashs[0]
+        h1 = hashs[1]
         nroot += '_' # separate the hash
-        imgdir = datadir+'/writing/'
-        imagepath= imgdir+nroot+hashs[0]+'_'+hashs[1]+'.png'
-        figure.savefig(imagepath,dpi=my_dpi)
-        print('your plot is saved to: ',imagepath)
-
-        ####  keep a "log book" if saved
-        dim = '6D'
-        notes = '{:} {:} {:}'.format(imagepath,hashs[0],hashs[1])
-        now = dt.datetime.now()
-        dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
-        logentry = '{:}, plot saved: {:}'.format(dtstring,notes)
-        f =open('search_logbook.txt','a')
-        print(logentry,file=f)
-        f.close()
-        ####
+        imgdir = datad+'/writing/'
+        imgname = nroot + hs[0]+'_'+hs[1]+'.png'
+        cto.plotSave(figure, datadir, imgname)
 
     else:
         print('plot image NOT saved')
+
 
 
 if __name__ ==  '__main__':
