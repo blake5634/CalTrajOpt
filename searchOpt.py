@@ -54,25 +54,6 @@ def main(args):
 
     c1 = cto.Cm(df = df)  # cost matrix
 
-    #prof
-    mem_snap('populate Cm')
-
-    pname = 'c1Costs.pickle'
-    if os.path.exists(pname):
-        print('loading precomputed cost matrix   ...')
-        f = open(pname, 'rb')
-        c1 = pickle.load(f)
-        print(' loading completed')
-    else:
-        print('no stored data: computing cost matrix')
-        c1.fill()
-        f = open(pname,'wb')
-        pickle.dump(c1,f)
-
-
-    #prof
-    mem_snap('Cm is filled')
-
     #
     # compute a path:
     #p = cto.path3d(gt,c1)
@@ -85,10 +66,13 @@ def main(args):
 
     #prof
     mem_snap('created datafile')
+
+
     ##########################################################
     #
     #  Grid Type:
-    c1.set_GridRandomize(df=df)  # random pts. INSTEAD of regular grid
+    RANDOMGRID = True   # remove the pickle file when changed!!!
+
     #
     # 1D only
     #searchtype = 'brute force'
@@ -104,13 +88,36 @@ def main(args):
 
     # cost:
     cts = ['time','energy']
-    cto.costtype = 'energy'
-    #cto.costtype = 'time'
+    #cto.costtype = 'energy'
+    cto.costtype = 'time'
     #
     ###########################################################
 
-    p.search(searchType,dfile=df,nsamples=nsamp,profiler=mem_snap)
 
+    #prof
+    mem_snap('populate Cm')
+
+    pname = 'c1Costs.pickle'
+    if os.path.exists(pname):
+        print('loading precomputed cost matrix   ...')
+        f = open(pname, 'rb')
+        c1 = pickle.load(f)
+        print(' loading completed')
+    else:
+        print('no stored data: computing cost matrix')
+        if RANDOMGRID:
+            c1.set_GridRandomize()  # random pts instead of grid
+        c1.fill()
+        f = open(pname,'wb')
+        pickle.dump(c1,f)
+
+
+    #prof
+    mem_snap('Cm is filled')
+
+
+
+    p.search(searchType,dfile=df,nsamples=nsamp,profiler=mem_snap)
     #prof
     mem_snap('completed the search')
 
@@ -122,11 +129,12 @@ def main(args):
 
     ####  keep a "log book"
     dim = '6D'
+    logdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/'
     notes = '{:}, n={:}, {:}, cost: {:4.2f} ({:})'.format(searchType, nsamp,dim, df.metadata.d['Min Cost'], cto.costtype)
     now = dt.datetime.now()
     dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
     logentry = '{:}, {:}, {:},  RQ: {:}'.format(dtstring,df.hashcode, notes, df.metadata.d['Research Question'])
-    f =open('search_logbook.txt','a')
+    f =open(logdir+'work_logbook.txt','a')
     print(logentry,file=f)
     f.close()
     ####

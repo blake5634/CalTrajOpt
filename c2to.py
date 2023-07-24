@@ -427,7 +427,6 @@ class Cm:  # save memory, Cm.m only contains cost pair ct,ce
         self.randgrid = True
         if df is not None:
             df.metadata.d['Random Grid'] = True
-
         return
 
     def fill(self):
