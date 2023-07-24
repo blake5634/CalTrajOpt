@@ -41,26 +41,21 @@ def main(args):
             df.open(mode='r',tname=mdname)
             #df.metadata.polish()  # convert metadata from strings to useful types
             df.close()
-            noQ = False
+            # RQ key came in two forms: with and without a space
             try:
                 q = df.metadata.d['Research Question']
-                if len(q)==0 or 'debug' in df.metadata.d['Research Question'].lower():
-                    print('deletable Research Q:',q)
+                if len(q)==0 or 'debug' in q.lower(): # there is no real RQ
                     remlist.append(fnr+'_meta.json')
                     remlist.append(fnr+'.csv')
             except:
-                noQ = True
+                pass
             try:
-                noQ = False
                 q = df.metadata.d['ResearchQuestion']
-                if len(q)==0 or 'debug' in df.metadata.d['ResearchQuestion'].lower():
-                    print('deletable Research Q:',q)
+                if len(q)==0 or 'debug' in q.lower(): # there is no real RQ
                     remlist.append(fnr+'_meta.json')
                     remlist.append(fnr+'.csv')
             except:
-                noQ = True
-            if noQ:
-                print('failed to access research question (old files)', fnr)
+                pass
         else:
             print('non existent metadata file: ',fnr)
             remlistCSV.append(fnr+'.csv')
@@ -70,22 +65,27 @@ def main(args):
         for fn in remlist:
             print(fn)
 
-        x = input('\n\n          OK to delete these files?? ...')
-
-        for fn in remlist:
-            print(' ... removing ',fn)
-            os.remove(fn)
+        x = input('\n\n          OK to delete these files?? ... (y/N)')
+        if x.lower() == 'y':
+            for fn in remlist:
+                print(' ... removing ',fn)
+                os.remove(fn)
+        else:
+            print('removing canceled')
 
     if len(remlistCSV) > 0:
         print('\n\nPlanning to remove the following .csv files which have no metadata:')
         for fn in remlistCSV:
             print(fn)
 
-        x = input('\n\n          OK to delete these files?? ...')
+        x = input('\n\n          OK to delete these files?? ... (y/N)')
 
-        for fn in remlistCSV:
-            print(' ... removing ',fn)
-            os.remove(fn)
+        if x.lower() == 'y':
+            for fn in remlistCSV:
+                print(' ... removing ',fn)
+                os.remove(fn)
+        else:
+            print('removing canceled')
 
     print('.. Done')
 

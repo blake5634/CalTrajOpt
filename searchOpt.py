@@ -10,6 +10,7 @@ import sys
 import os
 import pickle
 import brl_data.brl_data as bd
+import datetime as dt
 
 #import matplotlib.pyplot as plt
 
@@ -34,6 +35,15 @@ def mem_report():
 
 def main(args):
 
+
+    q = input('Enter your research question: ')
+
+    # create the datafile:
+    df = bd.datafile('6Dsearching','BH','simulation')
+    df.set_folders('/home/blake/Sync/Research/CalTrajOpt_RESULTS','')
+
+    df.metadata.d['Research Question'] = q
+
     #prof
     #start_tracker([cto.Cm, cto.point3D,cto.path3D,bd.datafile])
     start_tracker([cto.search_from_curr_pt,cto.path3D])
@@ -42,12 +52,10 @@ def main(args):
     cto.configure()
     idx = int(args[1])
 
-    c1 = cto.Cm()  # cost matrix
+    c1 = cto.Cm(df = df)  # cost matrix
 
     #prof
-    mem_snap('create Cm')
-
-    q = input('Enter your research question: ')
+    mem_snap('populate Cm')
 
     pname = 'c1Costs.pickle'
     if os.path.exists(pname):
@@ -75,31 +83,31 @@ def main(args):
     #prof
     mem_snap('created path3D()')
 
-    # create the datafile:
-    df = bd.datafile('6Dsearching','BH','simulation')
-    df.set_folders('/home/blake/Sync/Research/CalTrajOpt_RESULTS','')
-
-    df.metadata.d['Research Question'] = q
-
     #prof
     mem_snap('created datafile')
     ##########################################################
     #
+    #  Grid Type:
+    c1.set_GridRandomize(df=df)  # random pts. INSTEAD of regular grid
+    #
     # 1D only
-    searchtype = 'brute force'
+    #searchtype = 'brute force'
     # 4x4 and 6D:
-    searchType = 'multi heuristic'
-    #searchType = 'sampling search'
+    #searchType = 'multi heuristic'
+    searchType = 'sampling search'
 
     # approx 1M samples
     nsamp = 4*cto.N**6  # at least one for each starting point(!)
     #nsamp = N**6 # 1M
 
-    #nsamp = 3 # for testing
+    #nsamp = 60 # for testing
 
+    # cost:
+    cts = ['time','energy']
+    cto.costtype = 'energy'
+    #cto.costtype = 'time'
     #
     ###########################################################
-
 
     p.search(searchType,dfile=df,nsamples=nsamp,profiler=mem_snap)
 
@@ -111,6 +119,17 @@ def main(args):
 
     #prof
     mem_report()
+
+    ####  keep a "log book"
+    dim = '6D'
+    notes = '{:}, n={:}, {:}, cost: {:4.2f} ({:})'.format(searchType, nsamp,dim, df.metadata.d['Min Cost'], cto.costtype)
+    now = dt.datetime.now()
+    dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
+    logentry = '{:}, {:}, {:},  RQ: {:}'.format(dtstring,df.hashcode, notes, df.metadata.d['Research Question'])
+    f =open('search_logbook.txt','a')
+    print(logentry,file=f)
+    f.close()
+    ####
 
     print('Completed: see results at ',df.hashcode)
 

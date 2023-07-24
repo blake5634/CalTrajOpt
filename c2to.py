@@ -6,7 +6,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import brl_data.brl_data as bd
-import datetime as dt
+import datetime
 import sys
 import os
 import random
@@ -56,7 +56,7 @@ def configure(fp=None):
         parname = parname.strip()
         v = ' '.join(rest).strip() # parameter value as string
 
-        if parname == '#':
+        if parname.startswith('#'):
             next
 
         if parname =='costtype':
@@ -172,7 +172,7 @@ def plotSave(fig, dpi, imagedir, imagename):
     ####  keep a "log book" if saved
     dim = '6D'
     notes = '{:}, {:}'.format(dim,imagepath)
-    now = dt.datetime.now()
+    now = datetime.datetime.now()
     dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
     logentry = '{:}, plot saved: {:}'.format(dtstring,notes)
     f =open('search_logbook.txt','a')
@@ -205,6 +205,18 @@ class point3D:
             error('point3D: an index is too big for N!')
         self.xvect = [self.x,self.y,self.z,self.xd,self.yd,self.zd]
         self.valid = True
+
+    def randomize(self):
+        #
+        #  random point locations instead of grid
+        #
+        self.x =  np.random.uniform(-1,1)
+        self.y =  np.random.uniform(-1,1)
+        self.z =  np.random.uniform(-1,1)
+        self.xd =  np.random.uniform(-1,1)
+        self.yd =  np.random.uniform(-1,1)
+        self.zd =  np.random.uniform(-1,1)
+        self.xvect = [self.x,self.y,self.z,self.xd,self.yd,self.zd]
 
     def __eq__(self,x):
         for i,s in enumerate(self.ivect):
@@ -400,12 +412,23 @@ def cost_idxp(typestr, Cm, idxpath):   # compute total cost from a list of indec
     return Tc
 
 class Cm:  # save memory, Cm.m only contains cost pair ct,ce
-    def __init__(self):
+    def __init__(self,df=None):
         if M>5000:
             error('too many transitions for Cm! ',M*M)
 
         # this matrix will hold a trajectory for each transition from row to col
         self.m = [[ 0 for x in range(M)] for y in range(M)]
+        self.randgrid = False
+        if df is not None:
+            df.metadata.d['Random Grid'] = False
+
+
+    def set_GridRandomize(self,df=None):
+        self.randgrid = True
+        if df is not None:
+            df.metadata.d['Random Grid'] = True
+
+        return
 
     def fill(self):
         print('starting fill...')
@@ -418,6 +441,9 @@ class Cm:  # save memory, Cm.m only contains cost pair ct,ce
                     print('fill is {:.0%} done'.format(pct))
                 p1 = point3D(getcoord(i1))
                 p2 = point3D(getcoord(j1))
+                if  self.randgrid:  # select uniform random point location
+                    p1.randomize()
+                    p2.randomize()
                 t = trajectory3D(p1,p2)
                 if (p1 == p2):
                     t.valid = False  # eliminate self transitions
@@ -544,7 +570,7 @@ class path3D:
         predict_timing(dfile, searchtype,PCNAME, nsamples)
         #
         #  start timer
-        ts1 = dt.datetime.now()
+        ts1 = datetime.datetime.now()
         #
         #  select the type of search to do
         #
@@ -578,7 +604,7 @@ class path3D:
         else:
             error('path.search: unknown search type: ', searchtype)
         #report timing
-        ts2 = dt.datetime.now()
+        ts2 = datetime.datetime.now()
         dt = (ts2-ts1).total_seconds()
         print('seconds per {:} paths: {:}'.format(nsamples, float(dt)))
         print('seconds per path: {:}'.format(float(dt)/nsamples))
@@ -724,7 +750,7 @@ class path3D:
 
 
     def multiHSearch(self,dfile,nsearch,profiler=None):
-        ts1 = dt.datetime.now()
+        ts1 = datetime.datetime.now()
         self.datafile = dfile #keep track of this for adding metadata
         df = dfile
         print('Saving permutations (paths) to: ',df.name)
@@ -812,7 +838,9 @@ class path3D:
         print('Max # of ties: ',self.maxTiesHSearch)
         MULTIHISTO = True
         if MULTIHISTO:
-            fname = 'ties_info_'+ df.hashcode+'.txt'
+            if df.folder[-1] != '/':
+                df.folder.append('/')
+            fname = df.folder+'ties_info_'+ df.hashcode+'.txt'
             fp = open (fname, 'w')
             print('Distribution of tie choices: (',len(self.path),' points in path)',file=fp)
             print('\n  tie rank    |  how many times',file=fp)
