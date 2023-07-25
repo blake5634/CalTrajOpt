@@ -210,17 +210,18 @@ class point3D:
         #
         #  random point locations instead of grid
         #
-        self.x =  np.random.uniform(-1,1)
-        self.y =  np.random.uniform(-1,1)
-        self.z =  np.random.uniform(-1,1)
+        self.x  =  np.random.uniform(-1,1)
+        self.y  =  np.random.uniform(-1,1)
+        self.z  =  np.random.uniform(-1,1)
         self.xd =  np.random.uniform(-1,1)
         self.yd =  np.random.uniform(-1,1)
         self.zd =  np.random.uniform(-1,1)
         self.xvect = [self.x,self.y,self.z,self.xd,self.yd,self.zd]
 
-    def __eq__(self,x):
-        for i,s in enumerate(self.ivect):
-            if s != x.ivect[i]:
+    def __eq__(self, x):
+        for i,sxv in enumerate(self.xvect):
+            xxv = x.xvect[i]
+            if abs(sxv-xxv) > 0.01:
                 return False
         return True
 
@@ -418,6 +419,8 @@ class Cm:  # save memory, Cm.m only contains cost pair ct,ce
 
         # this matrix will hold a trajectory for each transition from row to col
         self.m = [[ 0 for x in range(M)] for y in range(M)]
+        # normally the points are in a regular 6 dim grid.  if Randgrid
+        # is true, they will be converted into uniform([-1,1)) in all coordinates
         self.randgrid = False
         if df is not None:
             df.metadata.d['Random Grid'] = False
@@ -447,12 +450,18 @@ class Cm:  # save memory, Cm.m only contains cost pair ct,ce
                 if (p1 == p2):
                     t.valid = False  # eliminate self transitions
                 else:
-                    #t.compute(DT_TEST)
+                    #
+                    #   save the cost in Cm (old: full trajectory in Cm
+                    #       was big mem hog.)
                     t.constrain_A()
                     a = t.timeEvolution(ACC_ONLY=True)
                     ce = t.cost_e(a)
                     ct = t.cost_t(a)
-                    self.m[i1][j1] = (ct,ce)  # new - save data size
+                    if (p1 == p2):
+                        t.valid = False  # eliminate self transitions
+                        self.m[i1][j1] = (0,0)
+                    else:
+                        self.m[i1][j1] = (ct,ce)
         print('done with fill...')
 
     def __repr__(self):
@@ -501,7 +510,13 @@ class search_from_curr_pt:
                     self.found = True
 
     def eval_cost(self,i1,i2):
-        tc,ec = self.path.Cm.m[i1][i2]
+        try:
+            tc,ec = self.path.Cm.m[i1][i2]
+        except Exception as ex:
+            print(type(ex).__name__, ex.args)
+            print('bad path indeces? ',i1,i2)
+            print('Cm[][]:',self.path.Cm.m[i1][i2])
+            quit()
         if self.costtype == 'energy':
             tc = ec #precomputed
         elif self.costtype == 'time':

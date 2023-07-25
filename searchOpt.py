@@ -44,7 +44,7 @@ def main(args):
 
     df.metadata.d['Research Question'] = q
 
-    #prof
+    # memory profiling
     #start_tracker([cto.Cm, cto.point3D,cto.path3D,bd.datafile])
     start_tracker([cto.search_from_curr_pt,cto.path3D])
 
@@ -61,10 +61,10 @@ def main(args):
 
 
 
-    #prof
+    # memory profiling
     mem_snap('created path3D()')
 
-    #prof
+    # memory profiling
     mem_snap('created datafile')
 
 
@@ -88,13 +88,16 @@ def main(args):
 
     # cost:
     cts = ['time','energy']
-    #cto.costtype = 'energy'
-    cto.costtype = 'time'
+    cto.costtype = 'energy'
+    #cto.costtype = 'time'
     #
     ###########################################################
+    if RANDOMGRID:
+        df.metadata.d['Random Grid'] = True
+    else:
+        df.metadata.d['Random Grid'] = False
 
-
-    #prof
+    # memory profiling
     mem_snap('populate Cm')
 
     pname = 'c1Costs.pickle'
@@ -102,34 +105,39 @@ def main(args):
         print('loading precomputed cost matrix   ...')
         f = open(pname, 'rb')
         c1 = pickle.load(f)
+        if RANDOMGRID:
+            c1.set_GridRandomize()  # needed? redundant??
         print(' loading completed')
     else:
         print('no stored data: computing cost matrix')
         if RANDOMGRID:
+            #print('    ... bug: always have to recompute in Random Grid mode!!!')
             c1.set_GridRandomize()  # random pts instead of grid
         c1.fill()
         f = open(pname,'wb')
         pickle.dump(c1,f)
 
 
-    #prof
+    # memory profiling
     mem_snap('Cm is filled')
 
 
 
     p.search(searchType,dfile=df,nsamples=nsamp,profiler=mem_snap)
-    #prof
+    # search will close the datafile
+
+    # memory profiling
     mem_snap('completed the search')
 
     # is it a valid path?
     #p.check()
 
-    #prof
+    # memory profiling
     mem_report()
 
     ####  keep a "log book"
     dim = '6D'
-    logdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/'
+    logdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
     notes = '{:}, n={:}, {:}, cost: {:4.2f} ({:})'.format(searchType, nsamp,dim, df.metadata.d['Min Cost'], cto.costtype)
     now = dt.datetime.now()
     dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
