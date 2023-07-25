@@ -9,6 +9,27 @@ import datetime as dt
 
 #import matplotlib.pyplot as plt
 
+def fill_check(Cmat):
+    print('checking the fill...')
+    nf = 0
+    M = cto.M
+    for i1 in range(M):  # go through all grid points
+        for j1 in range(M):
+            if Cmat.m[i1][j1] == 0:
+                print('{:},{:} has zero value'.format(i1,j1))
+            if type(Cmat.m[i1][j1]) != type((5.1,6.2)):
+                print('{:},{:}: has type {:}'.format(i1,j1,type((5.1,6.2))))
+            if i1 ==0 and j1 == 364:
+                ct,ce = Cmat.m[i1][j1]
+                print('{:},{:}: ct:{:4.1f} ce:{:4.1f}'.format(i1,j1,ct,ce))
+            if i1 ==364 and j1 == 364:
+                try:
+                    ct,ce = Cmat.m[i1][j1]
+                    print(' ... i1 == j1  worked')
+                except Exception as extype:
+                    print('Error: {:}, at {:},{:}: ct:{:4.1f} ce:{:4.1f}'.format(extype.__name__,i1,j1,-999.9, -999.9))
+    print('checking the fill COMPLETED')
+
 
 def main(args):
     q = 'debug Cm filling'
@@ -26,7 +47,7 @@ def main(args):
     c1.set_GridRandomize()  # needed? redundant??
     c1.fill()
 
-    c1.fill_check()
+    fill_check(c1)
 
     if False:
 
