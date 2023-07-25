@@ -61,7 +61,7 @@ def main(args):
         print('opening ', dfname)
         df = bd.datafile('', '','')  # open it with blank title info
         df.hashcode = dfname.split('_')[1]  # replace the newly generated hash code with the file of interest
-        hashs[ip]=df.hashcode
+        hs[ip]=df.hashcode
         df.set_folders(datadir,'')        # set these to wherever you want to open datafiles
         df.open('r',tname=datadir+'/'+dfname)
         df.metadata.polish()  # convert metadata from strings to useful types
@@ -93,7 +93,10 @@ def main(args):
     w = 1800
     h = 650
     plt.figure(figsize=(w/my_dpi, h/my_dpi), dpi=my_dpi)
+    maxx = 0
     for ip, dfname in enumerate([dfname1, dfname2]):
+        if max(xs[ip]) > maxx:
+            maxx = max(xs[ip])
         plt.bar(xs[ip],ys[ip],width=barwidth,color=colors[ip])
         #overplot normal distribution
         curve = norm.pdf(xs[ip],mus[ip],sds[ip])
@@ -102,6 +105,10 @@ def main(args):
             curve[i] *= scale
             #c2[i] *= scale
         plt.plot(xs[ip],curve)
+    #round up maxx by 1000
+    maxx = (maxx//1000 + 1)*1000
+    # plot relative to 0 for visual comparison
+    plt.xlim([0,maxx])
     plt.title('{:} cost distributions'.format(costtype))
     plt.xlabel('Cost      ({:},{:})'.format(hs[0],hs[1]))
     plt.ylabel('# paths')
@@ -113,12 +120,13 @@ def main(args):
     print('filename template: ',template)
     nroot = input('enter name root: (<enter> to not save) ')
     if len(nroot)>0:
-        h0 = hashs[0]
-        h1 = hashs[1]
+        h0 = hs[0]
+        h1 = hs[1]
         nroot += '_' # separate the hash
-        imgdir = datad+'/writing/'
+        imgdir = datadir+'/writing/'
         imgname = nroot + hs[0]+'_'+hs[1]+'.png'
-        cto.plotSave(figure, datadir, imgname)
+        idpi = 200
+        cto.plotSave(figure, idpi, imgdir, imgname)
 
     else:
         print('plot image NOT saved')
