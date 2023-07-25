@@ -165,7 +165,9 @@ def plotSave(fig, dpi, imagedir, imagename):
     #datad = string path to data directory
     if imagedir[-1] != '/':
         imagedir += '/'
-    imagepath = imagedir+imagename+'.png'
+    imagepath = imagedir+imagename
+    if '.png' not in imagepath:
+        imagepath += '.png'
     fig.savefig(imagepath,dpi=dpi)
     print('your plot is saved to: ',imagepath)
 
@@ -403,6 +405,8 @@ def cost_idxp(typestr, Cm, idxpath):   # compute total cost from a list of indec
     for i in range(L):
         i1 = idxpath[i]
         i2 = idxpath[i+1]
+        if i1==i2:
+            error('path repeats a node index')
         ct,ce = Cm.m[i1][i2]
         if typestr == 'energy':
             Tc += ce
