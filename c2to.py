@@ -33,7 +33,7 @@ startrow = 3
 startcol = 1
 
 def configure(fp=None):
-    global costtype, AMAX, DT_TEST, N, NPC, startrow, startcol
+    global costtype, AMAX, DT_TEST, N, M, NPC, startrow, startcol
     if not fp:
         f = open('ctoConfig.txt','r')
     else:
@@ -154,6 +154,11 @@ class point2D:
             msg += str(self.v) + '  '
             error(msg)
         self.tr = None
+
+    def randomize(self):
+        self.x = np.random.uniform(-1,1)
+        self.v = np.random.uniform(-1,1)
+        return
 
     def __eq__(self,x):
         return self.row == x.row and self.col == x.col
@@ -287,8 +292,20 @@ class trajectory2D:
         return str(self.p1) + ' ---> ' + str(self.p2)
 
 class Cm: # matrix full of trajectory2D objs
-    def __init__(self):
+    def __init__(self,df=None):
         self.m = [[ 0 for x in range(N*N)] for y in range(N*N)]
+        # normally the points are in a regular 6 dim grid.  if Randgrid
+        # is true, they will be converted into uniform([-1,1)) in all coordinates
+        self.randgrid = False
+        if df is not None:
+            df.metadata.d['Random Grid'] = False
+
+
+    def set_GridRandomize(self,df=None):
+        self.randgrid = True
+        if df is not None:
+            df.metadata.d['Random Grid'] = True
+        return
 
     def fill(self, grid):
         print('starting fill...{:}x{:}'.format(N,N))
@@ -307,6 +324,9 @@ class Cm: # matrix full of trajectory2D objs
                         #print('i1, j1, i2, j2:',i1,j1,i2,j2)
                         p1 = grid.gr[i1][j1]
                         p2 = grid.gr[i2][j2]
+                        if  self.randgrid:  # select uniform random point location
+                            p1.randomize()
+                            p2.randomize()
                         t = trajectory2D(p1,p2)
                         #print('computing cost: ',t)
                         if (p1.x == p2.x and p1.v == p2.v):
@@ -365,6 +385,8 @@ class quartile():
             change = True
         return change
 
+MAXTIEHISTO = 50  # how many bins for the tie frequency histogram
+
 class path:
     def __init__(self,grid,Cm):
         self.Cm = Cm      # cost matrix (actually trajectories)
@@ -378,6 +400,9 @@ class path:
         self.idxpath = [] # the path as a list of indeces (0..N*N)
         self.searchtype = 'none yet'
         self.datafile = None
+        #collect tie stats on this path
+        self.maxTiesHSearch = -99999999  # most ties when greedy searching
+        self.tie_freq = np.zeros(MAXTIEHISTO)  # histogram of how many ties of
 
     def search(self,searchtype,dfile=None,nsamples=1000):
         self.searchtype = searchtype
@@ -623,11 +648,45 @@ class path:
         df.metadata.d['Min Cost']=cmin
         df.metadata.d['Max Cost']=cmax
         df.metadata.d['Max Ties']=maxTies
-        print('Lowest cost path: ', pmin)
-        print('path cost: ', cmin)
-        print('Highest cost path: ', pmax)
-        print('path cost: ', cmax)
+        print('min/max path cost: ', cmin,cmax)
+        #print('Lowest cost path: ', pmin)
+        #print('Highest cost path: ', pmax)
         print('Max # of ties: ',maxTies)
+
+        # save a csv file for tie histogram
+        MULTIHISTO = True
+        if MULTIHISTO:
+            destfolder = df.folder
+            if destfolder[-1] != '/':
+                destfolder.append('/')
+            tfname = destfolder+'ties_info_'+ df.hashcode+'.csv'
+            fp = open (tfname, 'w')
+            #print('Distribution of tie choices: (',len(self.path),' points in path)',file=fp)
+            #print('\n  tie rank    |  how many times',file=fp)
+            #print('----------------------------------------',file=fp)
+            #sum = 0
+            #medianflag = True
+            fmtstring1 = '{:8d} , {:8d} '
+            #fmtstring2 = '{:8d}     |     {:8d} << median'
+            median=0
+            for i,n in enumerate(self.tie_freq):
+                median += n
+            median /=2
+            df.metadata.d['Median Ties']=median
+            for i,n in enumerate(self.tie_freq):
+                #sum += int(n)
+                #if sum < median and medianflag :
+                    #fmt = fmtstring1
+                #elif medianflag:
+                    #fmt = fmtstring2
+                    #medianflag = False
+                #else:
+                    #fmt = fmtstring1
+                if i>1:
+                    print(fmtstring1.format(i,int(n)),file=fp)
+            fp.close()
+
+
         df.close()
         # return path object, float
         return pmin,pmin.Tcost
@@ -686,8 +745,19 @@ class path:
                     print('minCost:', minCost)
                     x = input('?...')
                     print('\n\n')
-            if len(tiebreakerlist)>maxTies:
-                maxTies = len(tiebreakerlist)
+            #####
+            #  Collect stats on the tiebrakkerlist
+            #####
+            L = len(tiebreakerlist)
+            #error condition checks
+            if L < 1:
+                error('search.select_next: no next trajs identified yet.')
+            if L>maxTies:
+                maxTies = L
+            if L > MAXTIEHISTO-1:  # pile all bigger ties into last bin
+                L = MAXTIEHISTO-1
+            self.tie_freq[L] += 1  # count how many ties with each multiplicity L
+
 
             # pick a random entry from the ties
             newtraj = random.choice(tiebreakerlist)
