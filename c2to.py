@@ -161,10 +161,14 @@ class point2D:
         return
 
     def __eq__(self,x):
-        return self.row == x.row and self.col == x.col
+        #return self.row == x.row and self.col == x.col
+        epsilon = 0.002
+        ex = abs(self.x-x.x)/x.x < epsilon
+        ev = abs(self.v-x.v)/x.v < epsilon
+        return ex and ev
 
     def __repr__(self):
-        return ' ({:4.1f}, {:4.1f})'.format(self.x, self.v)
+        return ' ({:4.2f}, {:4.2f})'.format(self.x, self.v)
         #return ' ({:}, {:})'.format(self.row, self.col)
 
 
@@ -339,7 +343,7 @@ class Cm: # matrix full of trajectory2D objs
                             t.cost_e(a)
                             t.cost_t()
 
-                        self.m[r][c] = t
+                        self.m[r][c] = t   # store the trajectory
         print('done with fill...')
 
     def __repr__(self):
@@ -519,11 +523,12 @@ class path:
             tmpTrajList = []
             for i in range(len(idxpath)-1):
                 # build next trajectory
-                row,col = idx2ij(p[i])
-                p1 = point2D(row,col)
-                row,col = idx2ij(p[i+1])
-                p2 = point2D(row,col)
-                tr = trajectory2D(p1,p2)
+                #row,col = idx2ij(p[i])
+                #p1 = point2D(row,col)
+                #row,col = idx2ij(p[i+1])
+                #p2 = point2D(row,col)
+                #tr = trajectory2D(p1,p2)
+                tr = Cm.m[i][i+1]
                 tr.constrain_A()
                 tmpTrajList.append(tr)
                 if costtype == 'energy':
@@ -722,7 +727,7 @@ class path:
             if len(edge_next_tr)==0:
                 error('somethings wrong: i cant find a next node!')
             minCost = min(edge_costs) # will be either a time or energy cost
-            epsilon = 0.02*minCost  # within 5% is a tie
+            epsilon = 0.02*minCost  # within 2% is a tie
             tiebreakerlist = []
             costTmpList = []
 
