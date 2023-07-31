@@ -295,6 +295,11 @@ class trajectory2D:
     def __repr__(self):
         return str(self.p1) + ' ---> ' + str(self.p2)
 
+    def aprtr(self,msg):
+        print(msg)
+        print('start: {:4.2f}, {:4.2f}'.format(self.p1.x,self.p1.v))
+        print('goal:  {:4.2f}, {:4.2f}'.format(self.p2.x,self.p2.v))
+
 class Cm: # matrix full of trajectory2D objs
     def __init__(self,df=None):
         self.m = [[ 0 for x in range(N*N)] for y in range(N*N)]
@@ -312,30 +317,36 @@ class Cm: # matrix full of trajectory2D objs
         return
 
     def fill(self, grid):
+        nselftr = 0
         print('starting fill...{:}x{:}'.format(N,N))
+        if self.randgrid:  # need to store a point for each col
+            colpoints = [] # store the randomized point for each col (just once)
+            for i2 in range(N):  # for all 2nd points
+                for j2 in range(N):
+                    p2 = grid.gr[i2][j2]  # i2,j2 have same end point p2
+                    p2.randomize()   #only randimize ONCE per row
+                    colpoints.append(p2)
         for i1 in range(N):  # go through first points
             for j1 in range(N):
+                p1 = grid.gr[i1][j1]  # i1,j1 is starting pt w/ same p1
+                if self.randgrid:
+                    p1.randomize() # only once per col
                 for i2 in range(N):  # for all 2nd points
                     for j2 in range(N):
+                        if self.randgrid:
+                            p2=colpoints[i2*N+j2]  # i2,j2 have same end point p2
+                        else:
+                            p2 = grid.gr[i2][j2]
                         m=max(i1,j1,i2,j2)
                         if m>N-1:
                             error('index too big: {:}/{:}'.format(m,N))
-                        #r = i1*N + j1
-                        #c = i2*N + j2
                         r = ij2idx(i1,j1)  # point to row and col
                         c = ij2idx(i2,j2)  # of the cost matrix
-                        #print('r,c:',r,c)
-                        #print('i1, j1, i2, j2:',i1,j1,i2,j2)
-                        p1 = grid.gr[i1][j1]
-                        p2 = grid.gr[i2][j2]
-                        if  self.randgrid:  # select uniform random point location
-                            p1.randomize()
-                            p2.randomize()
                         t = trajectory2D(p1,p2)
-                        #print('computing cost: ',t)
                         if (p1.x == p2.x and p1.v == p2.v):
+                            nselftr += 1
                             t.valid = False  # eliminate self transitions
-                        else:
+                        else:  # compute the two costsF
                             #t.compute(DT_TEST) #get coeffs
                             t.constrain_A()    #constrain for Amax
                             a = t.timeEvolution(ACC_ONLY=True)
@@ -345,6 +356,7 @@ class Cm: # matrix full of trajectory2D objs
 
                         self.m[r][c] = t   # store the trajectory
         print('done with fill...')
+        print('# of self-state (invalid) transitions: ',nselftr, ' (expected N*N): ', N*N)
 
     def __repr__(self):
         res = 'Cm cost matrix:\n'
@@ -528,7 +540,7 @@ class path:
                 #row,col = idx2ij(p[i+1])
                 #p2 = point2D(row,col)
                 #tr = trajectory2D(p1,p2)
-                tr = Cm.m[i][i+1]
+                tr = self.Cm.m[i][i+1]
                 tr.constrain_A()
                 tmpTrajList.append(tr)
                 if costtype == 'energy':
@@ -713,6 +725,8 @@ class path:
                 if self.mark[ccol]:  # only unvisited
                     # look at all unvisited branches leaving current pt
                     ctraj = self.Cm.m[crow][ccol]
+                    print('crow,ccol:',crow,ccol)
+                    ctraj.aprtr('pull tr from Cm')
                     if ctraj.valid: # don't do self transitions
                         if costtype == 'energy':
                             ccost = ctraj.e_cost # now pre-computed
@@ -723,6 +737,7 @@ class path:
                         #print('  cost:',ccost)
                         edge_next_tr.append(ctraj) # collect all branches out
                         edge_costs.append(ccost)   # costs of these branches
+
             # now we have to choose a random branch having min cost
             if len(edge_next_tr)==0:
                 error('somethings wrong: i cant find a next node!')
@@ -869,6 +884,7 @@ class path:
         return fig
 
     def plotOnePath(self,fig):
+        # get endpoints for arrows
         x_values = [traj.p1.x for traj in self.path]  # starting values
         y_values = [traj.p1.v for traj in self.path]
         x_values.append(self.path[-1].p2.x)
@@ -900,7 +916,7 @@ class path:
             color='red'
         )
 
-
+        # get curves for each arc
         cx, cy = self.compute_curves(-1) #compute trajectory path
         ax.plot(cx,cy,color='blue')
         axlim = 2

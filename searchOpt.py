@@ -25,11 +25,12 @@ def main(args):
     ###################################################
     #    Search type and size
     #
-
+    cto.N = 4
+    cto.M = 16
     #SEARCHT = 'heuristic search' # greedy nearest neighbor
     #SEARCHT = 'brute force'   # enumerate all paths
-    #SEARCHT = 'sampling search' # nsearch random paths
-    SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
+    SEARCHT = 'sampling search' # nsearch random paths
+    #SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
 
     #nsearch = int(np.math.factorial(9)* 0.10)  # 10% of 3x3
     #nsearch = 1000000  # 1M
@@ -47,9 +48,10 @@ def main(args):
 
     # cost matrix
     c1 = cto.Cm()
-    c1.set_GridRandomize(df=df)
+    c1.set_GridRandomize(df=df)  # select random instead of grid
 
     c1.fill(gt)
+    x = input('    pause ...')
 
 
     # instatntiate a path:
