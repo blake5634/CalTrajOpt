@@ -44,6 +44,11 @@ def main(args):
 
     df.metadata.d['Research Question'] = q
 
+
+    # memory profiling
+    mem_snap('created datafile')
+
+
     # memory profiling
     #start_tracker([cto.Cm, cto.point3D,cto.path3D,bd.datafile])
     start_tracker([cto.search_from_curr_pt,cto.path3D])
@@ -52,21 +57,20 @@ def main(args):
     cto.configure()
     idx = int(args[1])
 
-    c1 = cto.Cm(df = df)  # cost matrix
+    pts = cto.setupPoints()   # just store points instead of cost matrix Cm
+    #c1 = cto.Cm(df = df)  # cost matrix
 
-    #
-    # compute a path:
-    #p = cto.path3d(gt,c1)
-    p = cto.path3D(c1)
 
 
 
     # memory profiling
     mem_snap('created path3D()')
 
-    # memory profiling
-    mem_snap('created datafile')
 
+    #
+    # compute a path:
+    #p = cto.path3d(gt,c1)
+    p = cto.path3D()
 
     ##########################################################
     #
@@ -98,28 +102,28 @@ def main(args):
         df.metadata.d['Random Grid'] = False
 
     # memory profiling
-    mem_snap('populate Cm')
+    ## memory profiling
+    #mem_snap('populate Cm')
 
-    pname = 'c1Costs.pickle'
-    if os.path.exists(pname):
-        print('loading precomputed cost matrix   ...')
-        f = open(pname, 'rb')
-        c1 = pickle.load(f)
-        if RANDOMGRID:
-            c1.set_GridRandomize()  # needed? redundant??
-        print(' loading completed')
-    else:
-        print('no stored data: computing cost matrix')
-        if RANDOMGRID:
-            #print('    ... bug: always have to recompute in Random Grid mode!!!')
-            c1.set_GridRandomize()  # random pts instead of grid
-        c1.fill()
-        f = open(pname,'wb')
-        pickle.dump(c1,f)
+    #pname = 'c1Costs.pickle'
+    #if os.path.exists(pname):
+        #print('loading precomputed cost matrix   ...')
+        #f = open(pname, 'rb')
+        #c1 = pickle.load(f)
+        #if RANDOMGRID:
+            #c1.set_GridRandomize()  # needed? redundant??
+        #print(' loading completed')
+    #else:
+        #print('no stored data: computing cost matrix')
+        #if RANDOMGRID:
+            ##print('    ... bug: always have to recompute in Random Grid mode!!!')
+            #c1.set_GridRandomize()  # random pts instead of grid
+        #c1.fill()
+        #f = open(pname,'wb')
+        #pickle.dump(c1,f)
 
 
-    # memory profiling
-    mem_snap('Cm is filled')
+    #mem_snap('Cm is filled')
 
 
 

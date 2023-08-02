@@ -102,6 +102,13 @@ def getcoord(idx):
         r = (r-v[5-i])//N
     return v
 
+def setupPoints():
+    global pts
+    pts = []
+    for i in range(N**6):
+        pts.append(point3D(getcoord(i)))
+    return pts
+
 def predict_timing(df, searchtype, systemName, nsamp):
     #
     # predict the search timing
@@ -374,6 +381,12 @@ class trajectory3D:
         else:
             return t,x,v,a
 
+    def getCosts(self):
+        self.constrain_A()
+        a = self.timeEvolution(ACC_ONLY=True)
+        ce = self.cost_e(a)
+        ct = self.cost_t(a)
+
     #
     #   Energy cost: sum of squared acceleration
     def cost_e(self, a):  #3D
@@ -397,7 +410,7 @@ class trajectory3D:
     def __repr__(self):
         return str(self.p1) + ' ---> ' + str(self.p2)
 
-def cost_idxp(typestr, Cm, idxpath):   # compute total cost from a list of indeces
+def cost_idxp(typestr, idxpath):   # compute total cost from a list of indeces
     L = len(idxpath)-1
     if L != N**6-1:
         error('not a correct length path!: '+str(L))
@@ -407,7 +420,11 @@ def cost_idxp(typestr, Cm, idxpath):   # compute total cost from a list of indec
         i2 = idxpath[i+1]
         if i1==i2:
             error('path repeats a node index')
-        ct,ce = Cm.m[i1][i2]
+        #ct,ce = Cm.m[i1][i2]
+        tr = trajectory3D(pts[i1],pts[i2])
+        tr.getCosts()
+        ce = tr.e_cost
+        ct = tr.t_cost
         if typestr == 'energy':
             Tc += ce
         elif typestr == 'time':
@@ -438,6 +455,18 @@ class Cm:  # save memory, Cm.m only contains cost pair ct,ce
 
     def fill(self):
         print('starting fill...')
+        if self.randgrid:  # need to store a point for each col
+            #****************
+            #*
+            #*    Have to rethink this!!!
+            #*********************************
+            colpoints = [] # store the randomized point for each col (just once)
+            for i2 in range(N):  # for all 2nd points
+                for j2 in range(N):
+                    p2 = grid.gr[i2][j2]  # i2,j2 have same end point p2
+                    p2.randomize()   #only randimize ONCE per row
+                    colpoints.append(p2)
+
         nf = 0
         for i1 in range(M):  # go through all grid points
             for j1 in range(M):
@@ -448,7 +477,7 @@ class Cm:  # save memory, Cm.m only contains cost pair ct,ce
                 p1 = point3D(getcoord(i1))
                 p2 = point3D(getcoord(j1))
                 if  self.randgrid:  # select uniform random point location
-                    p1.randomize()
+                    p1.randomize()  # this is broken and we're not using .fill anymore! (8/2)
                     p2.randomize()
                 t = trajectory3D(p1,p2)
                 if (p1 == p2):
@@ -456,11 +485,12 @@ class Cm:  # save memory, Cm.m only contains cost pair ct,ce
                 else:
                     #
                     #   save the cost in Cm (old: full trajectory in Cm
-                    #       was big mem hog.)
-                    t.constrain_A()
-                    a = t.timeEvolution(ACC_ONLY=True)
-                    ce = t.cost_e(a)
-                    ct = t.cost_t(a)
+                    ##       was big mem hog.)
+                    t.getCosts()
+                    #t.constrain_A()
+                    #a = t.timeEvolution(ACC_ONLY=True)
+                    #ce = t.cost_e(a)
+                    #ct = t.cost_t(a)
                     if (p1 == p2):
                         t.valid = False  # eliminate self transitions
                         self.m[i1][j1] = (0,0)
@@ -515,19 +545,25 @@ class search_from_curr_pt:
 
     def eval_cost(self,i1,i2):
         try:
-            tc,ec = self.path.Cm.m[i1][i2]
+            #tc,ec = self.path.Cm.m[i1][i2]
+            p1 = pts[i1]
+            p2 = pts[i2]
+            tr = trajectory3D(p1,p2)
+            tr.getCosts()
+            tc = tr.t_cost
+            ec = tr.e_cost
         except Exception as ex:
             print(type(ex).__name__, ex.args)
             print('bad path indeces? ',i1,i2)
             print('Cm[][]:',self.path.Cm.m[i1][i2])
             quit()
         if self.costtype == 'energy':
-            tc = ec #precomputed
+            retCost = ec #precomputed
         elif self.costtype == 'time':
-            tc = tc # precomputed
+            retCost = tc # precomputed
         else:
             error('search:set_costtype: unknown cost type (3D): '+costtype)
-        return tc
+        return retCost
 
     def select_next(self):
         L = len(self.minidxs)
@@ -546,8 +582,9 @@ class search_from_curr_pt:
         # pick one at random
         #print('select_next: choosing a random min traj! from ',len(self.minidxs))
         ti = random.choice(self.minidxs) # index of next traj
-        tr = trajectory3D(point3D(getcoord(self.pstartIdx)),point3D(getcoord(ti)))
-        self.mark[ti] = False
+        #tr = trajectory3D(point3D(getcoord(self.pstartIdx)),point3D(getcoord(ti)))
+        tr = trajectory3D(pts[pstartIdx],pts[ti])
+        self.mark[ti] = False  # mark new point as visited
         return ti,tr #chosen next traj index, chosen next traj trajectory
 
     def find_all_cminTrs(self,index,v): # find a list of all next pts for which cost ~= cmin
@@ -556,7 +593,8 @@ class search_from_curr_pt:
         epsilon = self.cmin * 0.02 # define 'close'
         if self.mark[index]:
             tc = self.eval_cost(self.pstartIdx,index)  # get cost for this branch
-            tr = trajectory3D(point3D(getcoord(self.pstartIdx)),point3D(getcoord(index)))
+            #tr = trajectory3D(point3D(getcoord(self.pstartIdx)),point3D(getcoord(index)))
+            tr = trajectory3D(pts[pstartIdx],pts[index])
             if abs(tc-self.cmin) < epsilon:
                 self.minTrs.append(tr)
                 self.minidxs.append(index)
@@ -567,9 +605,10 @@ class search_from_curr_pt:
 MAXTIEHISTO = 100  # how many bins for the tie frequency histogram
 
 class path3D:
-    def __init__(self,Cm):
-        self.Cm = Cm      # cost matrix (actually trajectories)
-        sizer('path3D.Cm: ',self.Cm)
+    #def __init__(self,Cm):
+    def __init__(self):
+        #self.Cm = Cm      # cost matrix (actually trajectories)
+        #sizer('path3D.Cm: ',self.Cm)
         self.sr = startrow
         self.sc = startcol
         self.mark = [True for x in range(N**6)]  # true if pt is UNvisited
@@ -715,16 +754,16 @@ class path3D:
         n = -1
         cmin = 99999999999
         cmax = 0
-        pmax = path3D(self.Cm)
+        pmax = path3D()
         sizer('pmax1: ',pmax)
-        pmin = path3D(self.Cm)
+        pmin = path3D()
         sizer('pmax2: ',pmax)
         sizer('pmin: ',pmin)
         for p in piter:  # piter iterates to a series of lists of point indices
             # p is the current path [idx0,idx1,idx2 ...]
             # now get the cost of p
             idxpath = list(p)
-            c = cost_idxp(costtype, self.Cm, idxpath)  #what is cost of this path?
+            c = cost_idxp(costtype, idxpath)  #what is cost of this path?
             if n%2000 == 0:
                     print('path ',n) # I'm alive!
             if STOREDATA:
@@ -921,7 +960,7 @@ class path3D:
                 self.idxpath.append(nxtidx)
                 pstartIdx = nxtidx
                 #self.Tcost += search.cmin
-            self.Tcost = cost_idxp(costtype,self.Cm, self.idxpath)  # compute total cost of the path
+            self.Tcost = cost_idxp(costtype, self.idxpath)  # compute total cost of the path
 
             REPORTHISTO = False
             #if REPORTHISTO:
@@ -1126,9 +1165,10 @@ def main():
 
 
     print('\n\n    Cost tests')
-    a = tr12.timeEvolution(ACC_ONLY=True)
-    tr12.cost_e(a)
-    tr12.cost_t(a)
+    tr12.getCosts()
+    #a = tr12.timeEvolution(ACC_ONLY=True)
+    #tr12.cost_e(a)
+    #tr12.cost_t(a)
     assert tr12.e_cost > 0
     assert tr12.t_cost > 0
 
