@@ -62,6 +62,37 @@ def main(args):
 
 
 
+    ##########################################################
+    #
+    #  Grid Type:
+    RANDOMGRID = False   # remove the pickle file when changed!!!
+
+    #
+    # 1D only
+    #searchtype = 'brute force'
+    # 4x4 and 6D:
+    searchType = 'multi heuristic'
+    #searchType = 'sampling search'
+
+    # approx 1M samples
+    nsamp = 4*cto.N**6  # at least one for each starting point(!)
+    #nsamp = N**6 # 1M
+
+    #nsamp =40 # for testing
+
+    # cost:
+    cts = ['time','energy']
+    #cto.costtype = 'energy'
+    cto.costtype = 'time'
+    #
+    ###########################################################
+    if RANDOMGRID:
+        df.metadata.d['Random Grid'] = True
+        cto.gridType = 'random'
+    else:
+        df.metadata.d['Random Grid'] = False
+        cto.gridType = 'rectangular'
+
 
     # memory profiling
     mem_snap('created path3D()')
@@ -71,35 +102,6 @@ def main(args):
     # compute a path:
     #p = cto.path3d(gt,c1)
     p = cto.path3D()
-
-    ##########################################################
-    #
-    #  Grid Type:
-    RANDOMGRID = True   # remove the pickle file when changed!!!
-
-    #
-    # 1D only
-    #searchtype = 'brute force'
-    # 4x4 and 6D:
-    #searchType = 'multi heuristic'
-    searchType = 'sampling search'
-
-    # approx 1M samples
-    nsamp = 4*cto.N**6  # at least one for each starting point(!)
-    #nsamp = N**6 # 1M
-
-    #nsamp = 60 # for testing
-
-    # cost:
-    cts = ['time','energy']
-    cto.costtype = 'energy'
-    #cto.costtype = 'time'
-    #
-    ###########################################################
-    if RANDOMGRID:
-        df.metadata.d['Random Grid'] = True
-    else:
-        df.metadata.d['Random Grid'] = False
 
     # memory profiling
     ## memory profiling
@@ -139,16 +141,22 @@ def main(args):
     # memory profiling
     mem_report()
 
-    ####  keep a "log book"
-    dim = '6D'
-    logdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
-    notes = '{:}, n={:}, {:}, cost: {:4.2f} ({:})'.format(searchType, nsamp,dim, df.metadata.d['Min Cost'], cto.costtype)
-    now = dt.datetime.now()
-    dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
-    logentry = '{:}, {:}, {:},  RQ: {:}'.format(dtstring,df.hashcode, notes, df.metadata.d['Research Question'])
-    f =open(logdir+'work_logbook.txt','a')
-    print(logentry,file=f)
-    f.close()
+    logthis = True
+    q = df.metadata.d['Research Question']
+    if len(q)==0 or 'debug' in q:
+        logthis = False
+
+    if logthis:
+        ####  keep a "log book"
+        dim = '6D'
+        logdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
+        notes = '{:}, grid: {:}, n={:}, {:}, cost: {:4.2f} ({:})'.format(searchType, cto.gridType, nsamp,dim, df.metadata.d['Min Cost'], cto.costtype)
+        now = dt.datetime.now()
+        dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
+        logentry = '{:}, {:}, {:},  RQ: {:}'.format(dtstring,df.hashcode, notes, df.metadata.d['Research Question'])
+        f =open(logdir+'work_logbook.txt','a')
+        print(logentry,file=f)
+        f.close()
     ####
 
     print('Completed: see results at ',df.hashcode)

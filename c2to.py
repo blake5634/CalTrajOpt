@@ -31,7 +31,7 @@ M = Npts
 
 AMAX = 2  #  normalize for now.
 DT_TEST = 2.0
-DT_START = 1.0  # this needs to be 'smaller' so that Amax can be searched by
+DT_START = 1.5  # this needs to be 'smaller' so that Amax can be searched by
                 # lengthening dt, but if too small constrain_A can be too slow.
 
 NPC = 20  # number plot points per curve
@@ -45,7 +45,8 @@ startcol = 1
 
 def configure(fp=None):
     #print('Pyton path: ', sys.path)
-    global costtype, AMAX, DT_TEST, N, M, NPC, startrow, startcol
+    global costtype, AMAX, DT_TEST, N, M, NPC, startrow, startcol, gridType
+    gridType = 'rectangular'
     if not fp:
         f = open('ctoConfig.txt','r')
     else:
@@ -63,6 +64,10 @@ def configure(fp=None):
             if v not in ['time','energy']:
                 error('path.configure: unknown cost type: '+v)
             costtype = v
+        if parname =='gridType':
+            if v not in ['random','rectangular']:
+                error('path.configure: unknown gridType: '+v)
+            gridType = v
         if parname == 'amax':
             AMAX = float(v)
         if parname == 'dt_start': # starting val for constrain_A()
@@ -103,10 +108,20 @@ def getcoord(idx):
     return v
 
 def setupPoints():
-    global pts
+    global pts, Cm
+    Cm = Cm() # initially all zeros
     pts = []
-    for i in range(N**6):
-        pts.append(point3D(getcoord(i)))
+    if gridType == 'random':
+        for i in range(N**6):
+            newpt = point3D(getcoord(i))
+            newpt.randomize()
+            print('r',end='')
+            pts.append(newpt)
+    else:
+        for i in range(N**6):
+            newpt = point3D(getcoord(i))
+            print('.',end='')
+            pts.append(newpt)
     return pts
 
 def predict_timing(df, searchtype, systemName, nsamp):
@@ -326,15 +341,15 @@ class trajectory3D:
             ni += 1
             self.compute(dt)
             if self.get_Amax(dt) > AMAX:
-                dt *= 1.05  # if amax too big, slow down
+                dt *= 1.10  # if amax too big, slow down
             else:
                 break
-        dt *= 0.95  # back off prev opt and finetune
+        dt *= 0.9  # back off prev opt and finetune
         while True:
             ni += 1
             self.compute(dt)
             if self.get_Amax(dt) > AMAX:
-                dt *= 1.01
+                dt *= 1.04
             else:
                 break
         am = self.get_Amax(dt)
@@ -382,11 +397,19 @@ class trajectory3D:
             return t,x,v,a
 
     def getCosts(self):
-        self.constrain_A()
-        a = self.timeEvolution(ACC_ONLY=True)
-        ce = self.cost_e(a)
-        ct = self.cost_t(a)
-
+        idx1 = getidx(self.p1.ivect)
+        idx2 = getidx(self.p2.ivect)
+        if Cm.m[idx1][idx2] != 0: # if we've already computed
+            ct,ce = Cm.m[idx1][idx2]
+        else:
+            self.constrain_A()
+            a = self.timeEvolution(ACC_ONLY=True)
+            ce = self.cost_e(a)
+            ct = self.cost_t(a)
+            Cm.m[idx1][idx2] = (ct,ce) # store for potential re-use
+        self.t_cost = ct
+        self.e_cost = ce
+        return ct,ce
     #
     #   Energy cost: sum of squared acceleration
     def cost_e(self, a):  #3D
@@ -455,6 +478,7 @@ class Cm:  # save memory, Cm.m only contains cost pair ct,ce
 
     def fill(self):
         print('starting fill...')
+        error('not using fill anymore')
         if self.randgrid:  # need to store a point for each col
             #****************
             #*
@@ -471,7 +495,7 @@ class Cm:  # save memory, Cm.m only contains cost pair ct,ce
         for i1 in range(M):  # go through all grid points
             for j1 in range(M):
                 nf+=1
-                if nf%20000==0:
+                if nf%2000==0:
                     pct = i1/M
                     print('fill is {:.0%} done'.format(pct))
                 p1 = point3D(getcoord(i1))
@@ -486,7 +510,7 @@ class Cm:  # save memory, Cm.m only contains cost pair ct,ce
                     #
                     #   save the cost in Cm (old: full trajectory in Cm
                     ##       was big mem hog.)
-                    t.getCosts()
+                    t.getCosts(self)
                     #t.constrain_A()
                     #a = t.timeEvolution(ACC_ONLY=True)
                     #ce = t.cost_e(a)
@@ -549,16 +573,14 @@ class search_from_curr_pt:
             p1 = pts[i1]
             p2 = pts[i2]
             tr = trajectory3D(p1,p2)
-            tr.getCosts()
-            tc = tr.t_cost
-            ec = tr.e_cost
+            tc,te = tr.getCosts()
         except Exception as ex:
             print(type(ex).__name__, ex.args)
             print('bad path indeces? ',i1,i2)
-            print('Cm[][]:',self.path.Cm.m[i1][i2])
+            #print('Cm[][]:',self.path.Cm.m[i1][i2])
             quit()
         if self.costtype == 'energy':
-            retCost = ec #precomputed
+            retCost = te
         elif self.costtype == 'time':
             retCost = tc # precomputed
         else:
@@ -583,7 +605,7 @@ class search_from_curr_pt:
         #print('select_next: choosing a random min traj! from ',len(self.minidxs))
         ti = random.choice(self.minidxs) # index of next traj
         #tr = trajectory3D(point3D(getcoord(self.pstartIdx)),point3D(getcoord(ti)))
-        tr = trajectory3D(pts[pstartIdx],pts[ti])
+        tr = trajectory3D(pts[self.pstartIdx],pts[ti])
         self.mark[ti] = False  # mark new point as visited
         return ti,tr #chosen next traj index, chosen next traj trajectory
 
@@ -594,7 +616,7 @@ class search_from_curr_pt:
         if self.mark[index]:
             tc = self.eval_cost(self.pstartIdx,index)  # get cost for this branch
             #tr = trajectory3D(point3D(getcoord(self.pstartIdx)),point3D(getcoord(index)))
-            tr = trajectory3D(pts[pstartIdx],pts[index])
+            tr = trajectory3D(pts[self.pstartIdx],pts[index])
             if abs(tc-self.cmin) < epsilon:
                 self.minTrs.append(tr)
                 self.minidxs.append(index)
@@ -844,7 +866,7 @@ class path3D:
             USESTPT = False
         for i in range(N**6): # go through the start pts
             if USESTPT:
-                if i%2000==0:
+                if i%20==0:
                     print('multiple heuristic searches: ',i)  #I'm alive
             else:
                 print('searching starting point:',i)
@@ -875,12 +897,12 @@ class path3D:
                 df.write(datarow)
                 if c < cmin: # find lowest cost of the runs
                     cmin=c
-                    pmin = path3D(self.Cm)
+                    pmin = path3D()
                     pmin.path = pself.path
                     pmin.Tcost = c
                 if c > cmax: # find highest cost
                     cmax = c
-                    pmax = path3D(self.Cm)
+                    pmax = path3D()
                     pmax.path = self.path
                     pmax.Tcost = c
             if not USESTPT:
@@ -895,47 +917,48 @@ class path3D:
         print('Max # of ties: ',self.maxTiesHSearch)
         MULTIHISTO = True
         if MULTIHISTO:
-            if df.folder[-1] != '/':
-                df.folder.append('/')
-            fname = df.folder+'ties_info_'+ df.hashcode+'.txt'
-            fp = open (fname, 'w')
-            print('Distribution of tie choices: (',len(self.path),' points in path)',file=fp)
-            print('\n  tie rank    |  how many times',file=fp)
-            print('----------------------------------------',file=fp)
-            sum = 0
-            medianflag = True
-            fmtstring1 = '{:8d}     |     {:8d} '
-            fmtstring2 = '{:8d}     |     {:8d} << median'
+            destfolder = df.folder
+            if destfolder[-1] != '/':
+                destfolder.append('/')
+            tfname = destfolder+'ties_info_'+ df.hashcode+'.csv'
+            fp = open (tfname, 'w')
+            #print('Distribution of tie choices: (',len(self.path),' points in path)',file=fp)
+            #print('\n  tie rank    |  how many times',file=fp)
+            #print('----------------------------------------',file=fp)
+            #sum = 0
+            #medianflag = True
+            fmtstring1 = '{:8d} , {:8d} '
+            #fmtstring2 = '{:8d}     |     {:8d} << median'
             median=0
             for i,n in enumerate(self.tie_freq):
                 median += n
             median /=2
             df.metadata.d['Median Ties']=median
             for i,n in enumerate(self.tie_freq):
-                sum += int(n)
-                if sum < median and medianflag :
-                    fmt = fmtstring1
-                elif medianflag:
-                    fmt = fmtstring2
-                    medianflag = False
-                else:
-                    fmt = fmtstring1
-                print(fmt.format(i,int(n)),file=fp)
+                #sum += int(n)
+                #if sum < median and medianflag :
+                    #fmt = fmtstring1
+                #elif medianflag:
+                    #fmt = fmtstring2
+                    #medianflag = False
+                #else:
+                    #fmt = fmtstring1
+                if i>1:
+                    print(fmtstring1.format(i,int(n)),file=fp)
             fp.close()
-
         df.close()
         # return path object, float
         return pmin,pmin.Tcost
 
     def heuristicSearch3D(self, idx1,profiler=None):
         ADVANCED = True
-        BASIC = not ADVANCED  # where' just not going to do BASIC anymore
+        BASIC = not ADVANCED  # we're just not going to do BASIC anymore
 
         # sanity check!!
         if N**6 > 1.0E4:
             error('too big a search!!: '+float(N**6))
 
-        pstartIdx = idx1  # starting point (<N!)
+        startPtIdx = idx1  # starting point (<N!)
         self.mark = [True for x in range(N**6)]
         count = 0
         self.mark[idx1] = False # mark our starting point
@@ -944,21 +967,27 @@ class path3D:
         if ADVANCED:
             self.Tcost = 0.0
             self.path = []
-            self.idxpath = [pstartIdx] # path has a start point
+            self.idxpath = [startPtIdx] # path has a start point
             self.nmin_max = 0
+            latestIdx = startPtIdx
             while len(self.path) < N**6 - 1:
+                li = len(self.path)
+                if li%20==0:
+                    print('path pt: ',li)
                 search = search_from_curr_pt(self.mark,self)
-                search.pstartIdx = pstartIdx
+                search.pstartIdx = latestIdx
                 search.minTrs=[] #these will get all branches matching cmin cost.
                 search.minidxs=[]
                 search.iterate(N,search.find_cmin)
+                #print('               found cmin')
                 search.iterate(N,search.find_all_cminTrs)
+                #print('               found all ties')
                 if search.ties > self.maxTiesHSearch:  # keep track of greatest number of ties along this path
                     self.maxTiesHSearch = search.ties
                 nxtidx,nxtTr = search.select_next()   # break a possible tie btwn branches leaving this pt.
                 self.path.append(nxtTr)
                 self.idxpath.append(nxtidx)
-                pstartIdx = nxtidx
+                latestIdx = nxtidx
                 #self.Tcost += search.cmin
             self.Tcost = cost_idxp(costtype, self.idxpath)  # compute total cost of the path
 
@@ -1185,7 +1214,7 @@ def main():
 
     print('\n\nsearch test 1:   sampling random paths')
     searchtype = 'sampling search'
-    bpath = path3D(c1)
+    bpath = path3D()
     bpath.search(searchtype,dfile=df,nsamples=10000)
 
 
