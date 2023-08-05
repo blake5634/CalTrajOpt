@@ -28,8 +28,9 @@ def main(args):
     if len(hashstr) < 4:
         print(' you like to live dangerously! (might match multiple files)')
     dfname = None
+    tieflag = 'ties_info'
     for f in csvfiles:
-        if hashstr in f:
+        if hashstr in f and tieflag not in f:
             dfname = f
     if not dfname:
         bd.brl_error('Somethings wrong with hash string (not found)')

@@ -199,7 +199,8 @@ def plotSave(fig, dpi, imagedir, imagename):
     now = datetime.datetime.now()
     dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
     logentry = '{:}, plot saved: {:}'.format(dtstring,notes)
-    f =open('search_logbook.txt','a')
+    fdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
+    f =open(fdir + 'image_log.txt','a')
     print(logentry,file=f)
     f.close()
     ####
@@ -927,7 +928,7 @@ class path3D:
             #print('----------------------------------------',file=fp)
             #sum = 0
             #medianflag = True
-            fmtstring1 = '{:8d} , {:8d} '
+            fmtstring1 = '{:8d} , {:8d}, {:8.4f}'
             #fmtstring2 = '{:8d}     |     {:8d} << median'
             median=0
             for i,n in enumerate(self.tie_freq):
@@ -944,7 +945,7 @@ class path3D:
                 #else:
                     #fmt = fmtstring1
                 if i>1:
-                    print(fmtstring1.format(i,int(n)),file=fp)
+                    print(fmtstring1.format(i,int(n),np.log10(int(n))),file=fp)
             fp.close()
         df.close()
         # return path object, float

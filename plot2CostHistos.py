@@ -42,11 +42,13 @@ def main(args):
 
     dfname1 = None
     dfname2 = None
+    tieflag = 'ties_info'
     for f in csvfiles:
-        if hashstr1 in f:
+        if hashstr1 in f and not tieflag in f:
             dfname1 = f    # our desired file name
-        if hashstr2 in f:
+        if hashstr2 in f and not tieflag in f:
             dfname2 = f    # our desired file name
+    print('got here 2')
     if not dfname1:
         bd.brl_error('Somethings wrong with hash string '+hashstr1+' (not found)')
     if not dfname2:

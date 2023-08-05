@@ -53,7 +53,7 @@ def main(args):
     #start_tracker([cto.Cm, cto.point3D,cto.path3D,bd.datafile])
     start_tracker([cto.search_from_curr_pt,cto.path3D])
 
-    # create a path and plot it graphically
+    # read in some params from config file
     cto.configure()
     idx = int(args[1])
 
@@ -63,9 +63,10 @@ def main(args):
 
 
     ##########################################################
+    #(these will override the config file)
     #
     #  Grid Type:
-    RANDOMGRID = False   # remove the pickle file when changed!!!
+    RANDOMGRID = True
 
     #
     # 1D only
@@ -74,7 +75,7 @@ def main(args):
     searchType = 'multi heuristic'
     #searchType = 'sampling search'
 
-    # approx 1M samples
+    # 4 tries at each start point
     nsamp = 4*cto.N**6  # at least one for each starting point(!)
     #nsamp = N**6 # 1M
 
@@ -82,8 +83,8 @@ def main(args):
 
     # cost:
     cts = ['time','energy']
-    #cto.costtype = 'energy'
-    cto.costtype = 'time'
+    cto.costtype = 'energy'
+    #cto.costtype = 'time'
     #
     ###########################################################
     if RANDOMGRID:
@@ -145,6 +146,7 @@ def main(args):
     q = df.metadata.d['Research Question']
     if len(q)==0 or 'debug' in q:
         logthis = False
+        print('  result will not be added to log file')
 
     if logthis:
         ####  keep a "log book"
@@ -157,6 +159,7 @@ def main(args):
         f =open(logdir+'work_logbook.txt','a')
         print(logentry,file=f)
         f.close()
+        print('added log entry to: ',logdir+'work_logbook.txt')
     ####
 
     print('Completed: see results at ',df.hashcode)
