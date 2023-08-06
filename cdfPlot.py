@@ -52,7 +52,8 @@ def main(args):
     df.open('r',tname=dfdir+'/'+dfname)
     df.metadata.polish()  # convert metadata from strings to useful types
 
-
+    ########################################################################
+    # convert the histogram to sample cdf
     databinvals = df.metadata.d['CostHistogram_values']
     databinlevels = df.metadata.d['CostHistogram_levels']
     mu = df.metadata.d['CostMean']
@@ -63,6 +64,7 @@ def main(args):
     prop1 = databinlevels[-1]
     dom = prop1-prop0
 
+    #############################
     # normalize:
     normdblevels = []
     normdbvals = []
@@ -74,17 +76,35 @@ def main(args):
     for dv in databinvals:
         normdbvals.append(dv/totalsum)
 
-    #print('dbv:')
-    #print(normdbinvals)
-    #print('dblev:')
-    #print(databinlevels)
     cumdist = [0.0]
     tot = 0.0
     for dv in normdbvals:
         tot += dv
         cumdist.append(tot)
 
+    ##########################################################################
+    #  Try the ks-static
+    #
+    ncdata = []
+    for row in df.reader:
+        c = float(row[-1])
+        ncdata.append((c-mu)/sd)
 
+    k = stats.ks_1samp(ncdata, stats.norm.cdf)
+
+    ChiSq = k.statistic
+    pval = k.pvalue
+
+    print('Koloogorov-Smirnov results: ChiSq: {:8.5f}  pval = {:8.5f}, n={:}'.format(ChiSq, pval, len(ncdata)))
+
+    ########################
+    #  Q-Q plot
+    plt.figure()
+    ax = plt.gca()
+    stats.probplot(ncdata, dist='norm', fit=True, plot=ax, rvalue=True)
+
+    ########################
+    # overplot the two cdfs
     my_dpi = 200
     w = 1250
     h = 1250
@@ -92,6 +112,7 @@ def main(args):
     plt.plot(normdblevels, cumdist)
     plt.plot(normdblevels, ncdf) #, databinlevels,databinvals)
     plt.show()
+
 
 
 
