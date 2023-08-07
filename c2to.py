@@ -724,7 +724,7 @@ class path3D:
             print('Saving permutations (paths) to: ',df.name)
             itype = str(type(5))
             ftype = str(type(3.1415))
-            tps = [itype]*(N**6)      # path point seq
+            tps = [itype]*(N**6-1)      # path point seq
             tps.append(ftype) # the path cost's type
             names = []
             for i in range(N**6):
