@@ -33,7 +33,7 @@ startrow = 3
 startcol = 1
 
 def configure(fp=None):
-    global costtype, AMAX, DT_TEST, N, NPC, startrow, startcol
+    global costtype, AMAX, DT_TEST, N, M, NPC, startrow, startcol
     if not fp:
         f = open('ctoConfig.txt','r')
     else:
@@ -165,11 +165,20 @@ class point2D:
             error(msg)
         self.tr = None
 
+    def randomize(self):
+        self.x = np.random.uniform(-1,1)
+        self.v = np.random.uniform(-1,1)
+        return
+
     def __eq__(self,x):
-        return self.row == x.row and self.col == x.col
+        #return self.row == x.row and self.col == x.col
+        epsilon = 0.002
+        ex = abs(self.x-x.x)/x.x < epsilon
+        ev = abs(self.v-x.v)/x.v < epsilon
+        return ex and ev
 
     def __repr__(self):
-        return ' ({:4.1f}, {:4.1f})'.format(self.x, self.v)
+        return ' ({:4.2f}, {:4.2f})'.format(self.x, self.v)
         #return ' ({:}, {:})'.format(self.row, self.col)
 
 
@@ -296,32 +305,58 @@ class trajectory2D:
     def __repr__(self):
         return str(self.p1) + ' ---> ' + str(self.p2)
 
+    def aprtr(self,msg):
+        print(msg)
+        print('start: {:4.2f}, {:4.2f}'.format(self.p1.x,self.p1.v))
+        print('goal:  {:4.2f}, {:4.2f}'.format(self.p2.x,self.p2.v))
+
 class Cm: # matrix full of trajectory2D objs
-    def __init__(self):
+    def __init__(self,df=None):
         self.m = [[ 0 for x in range(N*N)] for y in range(N*N)]
+        # normally the points are in a regular 6 dim grid.  if Randgrid
+        # is true, they will be converted into uniform([-1,1)) in all coordinates
+        self.randgrid = False
+        if df is not None:
+            df.metadata.d['Random Grid'] = False
+
+
+    def set_GridRandomize(self,df=None):
+        self.randgrid = True
+        if df is not None:
+            df.metadata.d['Random Grid'] = True
+        return
 
     def fill(self, grid):
+        nselftr = 0
         print('starting fill...{:}x{:}'.format(N,N))
+        if self.randgrid:  # need to store a point for each col
+            colpoints = [] # store the randomized point for each col (just once)
+            for i2 in range(N):  # for all 2nd points
+                for j2 in range(N):
+                    p2 = grid.gr[i2][j2]  # i2,j2 have same end point p2
+                    p2.randomize()   #only randimize ONCE per row
+                    colpoints.append(p2)
         for i1 in range(N):  # go through first points
             for j1 in range(N):
+                p1 = grid.gr[i1][j1]  # i1,j1 is starting pt w/ same p1
+                if self.randgrid:
+                    p1.randomize() # only once per col
                 for i2 in range(N):  # for all 2nd points
                     for j2 in range(N):
+                        if self.randgrid:
+                            p2=colpoints[i2*N+j2]  # i2,j2 have same end point p2
+                        else:
+                            p2 = grid.gr[i2][j2]
                         m=max(i1,j1,i2,j2)
                         if m>N-1:
                             error('index too big: {:}/{:}'.format(m,N))
-                        #r = i1*N + j1
-                        #c = i2*N + j2
                         r = ij2idx(i1,j1)  # point to row and col
                         c = ij2idx(i2,j2)  # of the cost matrix
-                        #print('r,c:',r,c)
-                        #print('i1, j1, i2, j2:',i1,j1,i2,j2)
-                        p1 = grid.gr[i1][j1]
-                        p2 = grid.gr[i2][j2]
                         t = trajectory2D(p1,p2)
-                        #print('computing cost: ',t)
                         if (p1.x == p2.x and p1.v == p2.v):
+                            nselftr += 1
                             t.valid = False  # eliminate self transitions
-                        else:
+                        else:  # compute the two costsF
                             #t.compute(DT_TEST) #get coeffs
                             t.constrain_A()    #constrain for Amax
                             a = t.timeEvolution(ACC_ONLY=True)
@@ -329,8 +364,9 @@ class Cm: # matrix full of trajectory2D objs
                             t.cost_e(a)
                             t.cost_t()
 
-                        self.m[r][c] = t
+                        self.m[r][c] = t   # store the trajectory
         print('done with fill...')
+        print('# of self-state (invalid) transitions: ',nselftr, ' (expected N*N): ', N*N)
 
     def __repr__(self):
         res = 'Cm cost matrix:\n'
@@ -375,6 +411,8 @@ class quartile():
             change = True
         return change
 
+MAXTIEHISTO = 50  # how many bins for the tie frequency histogram
+
 class path:
     def __init__(self,grid,Cm):
         self.Cm = Cm      # cost matrix (actually trajectories)
@@ -388,6 +426,9 @@ class path:
         self.idxpath = [] # the path as a list of indeces (0..N*N)
         self.searchtype = 'none yet'
         self.datafile = None
+        #collect tie stats on this path
+        self.maxTiesHSearch = -99999999  # most ties when greedy searching
+        self.tie_freq = np.zeros(MAXTIEHISTO)  # histogram of how many ties of
 
     def search(self,searchtype,dfile=None,nsamples=1000):
         self.searchtype = searchtype
@@ -504,11 +545,12 @@ class path:
             tmpTrajList = []
             for i in range(len(idxpath)-1):
                 # build next trajectory
-                row,col = idx2ij(p[i])
-                p1 = point2D(row,col)
-                row,col = idx2ij(p[i+1])
-                p2 = point2D(row,col)
-                tr = trajectory2D(p1,p2)
+                #row,col = idx2ij(p[i])
+                #p1 = point2D(row,col)
+                #row,col = idx2ij(p[i+1])
+                #p2 = point2D(row,col)
+                #tr = trajectory2D(p1,p2)
+                tr = self.Cm.m[i][i+1]
                 tr.constrain_A()
                 tmpTrajList.append(tr)
                 if costtype == 'energy':
@@ -633,11 +675,45 @@ class path:
         df.metadata.d['Min Cost']=cmin
         df.metadata.d['Max Cost']=cmax
         df.metadata.d['Max Ties']=maxTies
-        print('Lowest cost path: ', pmin)
-        print('path cost: ', cmin)
-        print('Highest cost path: ', pmax)
-        print('path cost: ', cmax)
+        print('min/max path cost: ', cmin,cmax)
+        #print('Lowest cost path: ', pmin)
+        #print('Highest cost path: ', pmax)
         print('Max # of ties: ',maxTies)
+
+        # save a csv file for tie histogram
+        MULTIHISTO = True
+        if MULTIHISTO:
+            destfolder = df.folder
+            if destfolder[-1] != '/':
+                destfolder.append('/')
+            tfname = destfolder+'ties_info_'+ df.hashcode+'.csv'
+            fp = open (tfname, 'w')
+            #print('Distribution of tie choices: (',len(self.path),' points in path)',file=fp)
+            #print('\n  tie rank    |  how many times',file=fp)
+            #print('----------------------------------------',file=fp)
+            #sum = 0
+            #medianflag = True
+            fmtstring1 = '{:8d} , {:8d} '
+            #fmtstring2 = '{:8d}     |     {:8d} << median'
+            median=0
+            for i,n in enumerate(self.tie_freq):
+                median += n
+            median /=2
+            df.metadata.d['Median Ties']=median
+            for i,n in enumerate(self.tie_freq):
+                #sum += int(n)
+                #if sum < median and medianflag :
+                    #fmt = fmtstring1
+                #elif medianflag:
+                    #fmt = fmtstring2
+                    #medianflag = False
+                #else:
+                    #fmt = fmtstring1
+                if i>1:
+                    print(fmtstring1.format(i,int(n)),file=fp)
+            fp.close()
+
+
         df.close()
         # return path object, float
         return pmin,pmin.Tcost
@@ -659,6 +735,8 @@ class path:
                 if self.mark[ccol]:  # only unvisited
                     # look at all unvisited branches leaving current pt
                     ctraj = self.Cm.m[crow][ccol]
+                    print('crow,ccol:',crow,ccol)
+                    ctraj.aprtr('pull tr from Cm')
                     if ctraj.valid: # don't do self transitions
                         if costtype == 'energy':
                             ccost = ctraj.e_cost # now pre-computed
@@ -669,11 +747,12 @@ class path:
                         #print('  cost:',ccost)
                         edge_next_tr.append(ctraj) # collect all branches out
                         edge_costs.append(ccost)   # costs of these branches
+
             # now we have to choose a random branch having min cost
             if len(edge_next_tr)==0:
                 error('somethings wrong: i cant find a next node!')
             minCost = min(edge_costs) # will be either a time or energy cost
-            epsilon = 0.02*minCost  # within 5% is a tie
+            epsilon = 0.02*minCost  # within 2% is a tie
             tiebreakerlist = []
             costTmpList = []
 
@@ -696,8 +775,19 @@ class path:
                     print('minCost:', minCost)
                     x = input('?...')
                     print('\n\n')
-            if len(tiebreakerlist)>maxTies:
-                maxTies = len(tiebreakerlist)
+            #####
+            #  Collect stats on the tiebrakkerlist
+            #####
+            L = len(tiebreakerlist)
+            #error condition checks
+            if L < 1:
+                error('search.select_next: no next trajs identified yet.')
+            if L>maxTies:
+                maxTies = L
+            if L > MAXTIEHISTO-1:  # pile all bigger ties into last bin
+                L = MAXTIEHISTO-1
+            self.tie_freq[L] += 1  # count how many ties with each multiplicity L
+
 
             # pick a random entry from the ties
             newtraj = random.choice(tiebreakerlist)
@@ -804,6 +894,7 @@ class path:
         return fig
 
     def plotOnePath(self,fig):
+        # get endpoints for arrows
         x_values = [traj.p1.x for traj in self.path]  # starting values
         y_values = [traj.p1.v for traj in self.path]
         x_values.append(self.path[-1].p2.x)
@@ -835,7 +926,7 @@ class path:
             color='red'
         )
 
-
+        # get curves for each arc
         cx, cy = self.compute_curves(-1) #compute trajectory path
         ax.plot(cx,cy,color='blue')
         axlim = 2
