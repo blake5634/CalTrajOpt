@@ -25,7 +25,11 @@ def main(args):
 
     hashstr = args[1]
     res = mf.findh([hashstr, '.csv']) # find files with hash and are .csv ext.
-
+    res2=[]
+    for r in res:
+        if not 'ties' in r[1]:
+            res2.append(r)
+    res = res2
     if len(res) < 1:
         bd.brl_error(' file not found. hash: '+hashstr)
     if len(res) > 1:
