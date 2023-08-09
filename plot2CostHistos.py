@@ -99,6 +99,7 @@ def main(args):
     for ip, dfname in enumerate([dfname1, dfname2]):
         if max(xs[ip]) > maxx:
             maxx = max(xs[ip])
+            print('maxx: ',maxx, dfname)
         plt.bar(xs[ip],ys[ip],width=barwidth,color=colors[ip])
         #overplot normal distribution
         curve = norm.pdf(xs[ip],mus[ip],sds[ip])
@@ -109,6 +110,7 @@ def main(args):
         plt.plot(xs[ip],curve)
     #round up maxx by 1000
     maxx = (maxx//1000 + 1)*1000
+    #maxx = 11000
     # plot relative to 0 for visual comparison
     plt.xlim([0,maxx])
     plt.title('{:} cost distributions'.format(costtype))
@@ -127,8 +129,7 @@ def main(args):
         nroot += '_' # separate the hash
         imgdir = datadir+'/writing/'
         imgname = nroot + hs[0]+'_'+hs[1]+'.png'
-        idpi = 200
-        cto.plotSave(figure, idpi, imgdir, imgname)
+        cto.plotSave(figure, my_dpi, imgdir, imgname)
 
     else:
         print('plot image NOT saved')
