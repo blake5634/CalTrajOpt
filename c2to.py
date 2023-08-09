@@ -411,7 +411,7 @@ class quartile():
             change = True
         return change
 
-MAXTIEHISTO = 50  # how many bins for the tie frequency histogram
+MAXTIEHISTO = 80  # how many bins for the tie frequency histogram
 
 class path:
     def __init__(self,grid,Cm):
@@ -683,7 +683,7 @@ class path:
         # save a csv file for tie histogram
         MULTIHISTO = True
         if MULTIHISTO:
-            destfolder = df.folder
+            destfolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
             if destfolder[-1] != '/':
                 destfolder.append('/')
             tfname = destfolder+'ties_info_'+ df.hashcode+'.csv'
@@ -701,16 +701,13 @@ class path:
             median /=2
             df.metadata.d['Median Ties']=median
             for i,n in enumerate(self.tie_freq):
-                #sum += int(n)
-                #if sum < median and medianflag :
-                    #fmt = fmtstring1
-                #elif medianflag:
-                    #fmt = fmtstring2
-                    #medianflag = False
-                #else:
-                    #fmt = fmtstring1
                 if i>1:
-                    print(fmtstring1.format(i,int(n)),file=fp)
+                    if int(n) != 0:
+                        logval = np.log10(float(n))
+                    else:
+                        logval = -1
+                    #print(fmtstring1.format(i,int(n),logval),file=fp)
+                    print(f"{i:8}   |    {int(n):8}    |    {logval:8.2f}",file=fp)
             fp.close()
 
 

@@ -25,12 +25,15 @@ def main(args):
     ###################################################
     #    Search type and size
     #
+    gridtype = 'random'
+    #gridtype = 'rectangular'
+
     cto.N = 4
     cto.M = 16
     #SEARCHT = 'heuristic search' # greedy nearest neighbor
     #SEARCHT = 'brute force'   # enumerate all paths
-    SEARCHT = 'sampling search' # nsearch random paths
-    #SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
+    #SEARCHT = 'sampling search' # nsearch random paths
+    SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
 
     #nsearch = int(np.math.factorial(9)* 0.10)  # 10% of 3x3
     #nsearch = 1000000  # 1M
@@ -48,7 +51,8 @@ def main(args):
 
     # cost matrix
     c1 = cto.Cm()
-    c1.set_GridRandomize(df=df)  # select random instead of grid
+    if gridtype == 'random':
+        c1.set_GridRandomize(df=df)  # select random instead of grid
 
     c1.fill(gt)
     x = input('    pause ...')
@@ -61,7 +65,7 @@ def main(args):
     # is it a valid path?
     #p.check()
 
-    notes = 'Random Grid, {:}, cost: {:4.2f} ({:})'.format(SEARCHT, cmin, cto.costtype)
+    notes = f"{gridtype} grid, {SEARCHT}, cost: {cmin} (cto.costtype)"
 
     #  keep a "log book"
 
@@ -69,7 +73,9 @@ def main(args):
     dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
     logentry = '{:}, {:}, {:},  RQ: {:}'.format(dtstring,df.hashcode, notes, df.metadata.d['ResearchQuestion'])
 
-    f =open('search_logbook.txt','a')
+    logdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
+    logname = 'work_logbook.txt'
+    f =open(logdir+logname,'a')
     print(logentry,file=f)
     f.close()
 
