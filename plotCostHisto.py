@@ -30,8 +30,9 @@ def main(args):
 
     mf = bd.finder()
     mf.set_dirs(dirlist)
+
     hashstr = args[1]
-    res = mf.findh([hashstr, '.csv'])
+    res = mf.findh([hashstr, '.csv']) # find files with hash and are .csv ext.
 
     if len(res) < 1:
         brl_error(' file not found. hash: '+hashstr)
@@ -39,6 +40,7 @@ def main(args):
         brl_error('   too many results: '+hashstr)
     datadir = res[0][0]
     dfname  = res[0][1]
+
 
     #
     #  OK - now lets create a datafile and open it for reading

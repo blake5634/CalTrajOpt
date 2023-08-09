@@ -58,7 +58,8 @@ def main(args):
                 pass
         else:
             print('non existent metadata file: ',fnr)
-            remlistCSV.append(fnr+'.csv')
+            if 'ties' not in fnr:  # we have special csv files for ties data
+                remlistCSV.append(fnr+'.csv')
 
     if len(remlist) > 0:
         print('\n\nPlanning to remove the following file names (.jason and .csv):')
