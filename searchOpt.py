@@ -10,37 +10,6 @@ import datetime as dt
 
 
 def main(args):
-
-    ###################################################
-    #    Search type and size
-    #
-
-    #SEARCHT = 'heuristic search' # greedy nearest neighbor
-    #SEARCHT = 'brute force'   # enumerate all paths
-    #SEARCHT = 'sampling search' # nsearch random paths
-    SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
-
-    #nsearch = int(np.math.factorial(9)* 0.10)  # 10% of 3x3
-    nsearch = 1000000  # 1M
-    #
-    ###################################################
-
-    # create a path and plot it graphically
-    cto.configure()
-    #idx = int(args[1])
-    idx = -1
-
-    # create grid
-    gt = cto.grid2D(cto.N)
-
-    # cost matrix
-    c1 = cto.Cm()
-    c1.fill(gt)
-
-
-    # compute a path:
-    p = cto.path(gt,c1)
-
     #df = None  # no data file output
     df = bd.datafile('path_search_results','BH','simulation')
     dataFolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS'
@@ -51,12 +20,53 @@ def main(args):
         df.metadata.d['ResearchQuestion'] = input('Enter research question:')
     #  cto.point2D.search() will take care of metatada setup
 
-    path2, cmin = p.search(SEARCHT, dfile=df, nsamples=nsearch)
+    # create a path and plot it graphically
+    cto.configure()
+    ###################################################
+    #    Search type and size
+    #
+    #gridtype = 'random'
+    gridtype = 'rectangular'
 
+    cto.N = 4
+    cto.M = 16
+    #SEARCHT = 'heuristic search' # greedy nearest neighbor
+    #SEARCHT = 'brute force'   # enumerate all paths
+    #SEARCHT = 'sampling search' # nsearch random paths
+    SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
+
+    #nsearch = int(np.math.factorial(9)* 0.10)  # 10% of 3x3
+    #nsearch = 1000000  # 1M
+    nsearch = 5
+
+    cto.NPC = 30   #  # of simulation points in 0-dt time intervale
+    #
+    ###################################################
+
+    #idx = int(args[1])
+    idx = -1
+
+    # create grid
+    gt = cto.grid2D(cto.N)
+
+    # cost matrix
+    c1 = cto.Cm()
+    if gridtype == 'random':
+        c1.set_GridRandomize(df=df)  # select random instead of grid
+
+    c1.fill(gt)
+    x = input('    pause ...')
+
+
+    # instatntiate a path:
+    p = cto.path(gt,c1)
+    path2, cmin = p.search(SEARCHT, dfile=df, nsamples=nsearch)
+    print('Optimal path returned: (tra)', path2.path)
+    print('Optimal path returned: (idx)', path2.idxpath)
     # is it a valid path?
     #p.check()
 
-    notes = '{:}, cost: {:4.2f} ({:})'.format(SEARCHT, cmin, cto.costtype)
+    notes = f"{gridtype} grid, {SEARCHT}, cost: {cmin:8.1f} ({cto.costtype})\n      ({df.hashcode})"
 
     #  keep a "log book"
 
@@ -74,9 +84,9 @@ def main(args):
     else:
         print(f'debugging detected. {df.hashcode} will not be logged to {logdir+logfilename}')
 
-    print('your data file hash is:',df.hashcode)
-    # graph the path
-    #path2.plot(idx,notes)
+    print('\n\n               your data file hash is:',df.hashcode)
+    #graph the path
+    path2.plot(-1,notes)
     #p.plot(idx)
 
 

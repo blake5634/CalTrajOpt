@@ -33,7 +33,7 @@ startrow = 3
 startcol = 1
 
 def configure(fp=None):
-    global costtype, AMAX, DT_TEST, N, NPC, startrow, startcol
+    global costtype, AMAX, DT_TEST, N, M, NPC, startrow, startcol
     if not fp:
         f = open('ctoConfig.txt','r')
     else:
@@ -72,52 +72,62 @@ def idx2ij(idx):
     j = idx-N*i
     return i,j
 
-def predict_timing(searchtype, nsamp):
-      #
-        # predict the search timing
-        #
-        OK = True
-        if os.path.isfile('searchTiming.json'):
-            key = searchtype + '-' + PCNAME
-            fd = open('searchTiming.json','r')
-            d = json.load(fd)
-            print('n samples:',nsamp)
-            try:
-                t = d[key]
-            except:
-                OK=False
-            if OK:
-                print('your predicted search time is:')
-                print('search type/PC:',key)
-                print('rate:          ',d[key],'/sec')
-                sec = float(d[key])*nsamp
-                mins = sec/60
-                hrs = mins/60
-                days = hrs/24
-                years = days/365
-                print('predicted time: ')
-                fmth='{:30} {:>12} {:>12} {:>12} {:>12}'
-                print(fmth.format('PC type','mins','hrs','days','years'))
-                fmts='{:30} {:12.2f} {:12.2f} {:12.2f} {:12.2f}'
-                print(fmts.format(key, mins,hrs,days,years))
-                if mins>2:
-                    x=input('OK to continue? ...')
-        else:
-            OK=False #path is not a file
-        if not OK:
-            print('no search speed info available for your configuration: ',key)
-            x=input('OK to continue? ...')
+def predict_timing(df, searchtype, nsamp):
+    #
+    # predict the search timing
+    #
+    savedir = ''
+    if df is not None:
+        savedir = df.folder
+    filename = savedir + 'searchTiming.json'
+    OK = True
+    key = searchtype + '-' + PCNAME
+    if os.path.isfile(filename):
+        fd = open(filename,'r')
+        d = json.load(fd)
+        print('n samples:',nsamp)
+        try:
+            t = d[key]
+        except:
+            OK=False
+        if OK:
+            print('your predicted search time is:')
+            print('search type/PC:',key)
+            print('rate:          ',d[key],'/sec')
+            sec = float(d[key])*nsamp
+            mins = sec/60
+            hrs = mins/60
+            days = hrs/24
+            years = days/365
+            print('predicted time: ')
+            fmth='{:30} {:>12} {:>12} {:>12} {:>12}'
+            print(fmth.format('PC type','mins','hrs','days','years'))
+            fmts='{:30} {:12.2f} {:12.2f} {:12.2f} {:12.2f}'
+            print(fmts.format(key, mins,hrs,days,years))
+            if mins>2:
+                x=input('OK to continue? ...')
+    else:
+        OK=False #path is not a file
+    if not OK:
+        print('no search speed info available for your configuration: ',key)
+        x=input('OK to continue? ...')
 
-def save_timing(searchname,systemName,rate):
-    if os.path.isfile('searchTiming.json'):
-        fd = open('searchTiming.json','r')
+def save_timing(df, searchname,systemName,rate):
+    savedir = ''
+    if df is not None:
+        savedir = df.folder
+    filename = savedir + 'searchTiming.json'
+    if os.path.isfile(filename):
+        fd = open(filename,'r')
         d = json.load(fd)
     else:
         d = {}
+    # add to the dict and resave
     d[searchname+'-'+systemName] = rate
-    fd = open('searchTiming.json','w')
+    fd = open(filename,'w')
     json.dump(d,fd,indent=4)
     return
+
 
 class grid2D:
     def __init__(self, N):
@@ -155,11 +165,20 @@ class point2D:
             error(msg)
         self.tr = None
 
+    def randomize(self):
+        self.x = np.random.uniform(-1,1)
+        self.v = np.random.uniform(-1,1)
+        return
+
     def __eq__(self,x):
-        return self.row == x.row and self.col == x.col
+        #return self.row == x.row and self.col == x.col
+        epsilon = 0.002
+        ex = abs(self.x-x.x)/x.x < epsilon
+        ev = abs(self.v-x.v)/x.v < epsilon
+        return ex and ev
 
     def __repr__(self):
-        return ' ({:4.1f}, {:4.1f})'.format(self.x, self.v)
+        return ' ({:4.2f}, {:4.2f})'.format(self.x, self.v)
         #return ' ({:}, {:})'.format(self.row, self.col)
 
 
@@ -286,41 +305,59 @@ class trajectory2D:
     def __repr__(self):
         return str(self.p1) + ' ---> ' + str(self.p2)
 
+    def aprtr(self,msg):
+        print(msg)
+        print('start: {:4.2f}, {:4.2f}'.format(self.p1.x,self.p1.v))
+        print('goal:  {:4.2f}, {:4.2f}'.format(self.p2.x,self.p2.v))
+
 class Cm: # matrix full of trajectory2D objs
-    def __init__(self):
+    def __init__(self,df=None):
         self.m = [[ 0 for x in range(N*N)] for y in range(N*N)]
+        # normally the points are in a regular 6 dim grid.  if Randgrid
+        # is true, they will be converted into uniform([-1,1)) in all coordinates
+        self.randgrid = False
+        if df is not None:
+            df.metadata.d['Random Grid'] = False
+
+
+    def set_GridRandomize(self,df=None):
+        self.randgrid = True
+        if df is not None:
+            df.metadata.d['Random Grid'] = True
+        return
 
     def fill(self, grid):
+        nselftr = 0
         print('starting fill...{:}x{:}'.format(N,N))
-        for i1 in range(N):  # go through first points
-            for j1 in range(N):
-                for i2 in range(N):  # for all 2nd points
-                    for j2 in range(N):
-                        m=max(i1,j1,i2,j2)
-                        if m>N-1:
-                            error('index too big: {:}/{:}'.format(m,N))
-                        #r = i1*N + j1
-                        #c = i2*N + j2
-                        r = ij2idx(i1,j1)  # point to row and col
-                        c = ij2idx(i2,j2)  # of the cost matrix
-                        #print('r,c:',r,c)
-                        #print('i1, j1, i2, j2:',i1,j1,i2,j2)
-                        p1 = grid.gr[i1][j1]
-                        p2 = grid.gr[i2][j2]
-                        t = trajectory2D(p1,p2)
-                        #print('computing cost: ',t)
-                        if (p1.x == p2.x and p1.v == p2.v):
-                            t.valid = False  # eliminate self transitions
-                        else:
-                            #t.compute(DT_TEST) #get coeffs
-                            t.constrain_A()    #constrain for Amax
-                            a = t.timeEvolution(ACC_ONLY=True)
-                            #compute traj costs
-                            t.cost_e(a)
-                            t.cost_t()
-
-                        self.m[r][c] = t
+        if self.randgrid:  # need to store a point for each col
+            # go through the grid and randomize their x,v
+            for r in range(N):  # for all 2nd points
+                for c in range(N):
+                    p1 = grid.gr[r][c]
+                    p1.randomize()
+                    grid.gr[r][c] = p1
+        # now get a tr (and costs) for all possible transitions (row x col)
+        for i1 in range(N*N):
+            for j1 in range(N*N):
+                r1,c1 = idx2ij(i1)
+                r2,c2 = idx2ij(j1)
+                p1 = grid.gr[r1][c1]
+                p2 = grid.gr[r2][c2]
+                # we now have p1 and p2
+                t = trajectory2D(p1,p2)
+                if (p1.x == p2.x and p1.v == p2.v): # robust to random pts
+                    nselftr += 1
+                    t.valid = False  # eliminate self transitions
+                else:  # compute the two costsF
+                    #t.compute(DT_TEST) #get coeffs
+                    t.constrain_A()    #constrain for Amax
+                    a = t.timeEvolution(ACC_ONLY=True)
+                    #compute traj costs
+                    t.cost_e(a)
+                    t.cost_t()
+                self.m[i1][j1] = t   # store the trajectory
         print('done with fill...')
+        print('# of self-state (invalid) transitions: ',nselftr, ' (expected N*N): ', N*N)
 
     def __repr__(self):
         res = 'Cm cost matrix:\n'
@@ -365,6 +402,8 @@ class quartile():
             change = True
         return change
 
+MAXTIEHISTO = 80  # how many bins for the tie frequency histogram
+
 class path:
     def __init__(self,grid,Cm):
         self.Cm = Cm      # cost matrix (actually trajectories)
@@ -378,11 +417,14 @@ class path:
         self.idxpath = [] # the path as a list of indeces (0..N*N)
         self.searchtype = 'none yet'
         self.datafile = None
+        #collect tie stats on this path
+        self.maxTiesHSearch = -99999999  # most ties when greedy searching
+        self.tie_freq = np.zeros(MAXTIEHISTO)  # histogram of how many ties of
 
     def search(self,searchtype,dfile=None,nsamples=1000):
         self.searchtype = searchtype
 
-        predict_timing(searchtype, nsamples)
+        predict_timing(dfile, searchtype, nsamples)
         #
         #  start timer
         ts1 = datetime.datetime.now()
@@ -390,7 +432,7 @@ class path:
         #  select the type of search to do
         #
         if searchtype.startswith('heur'):
-            p, cmin = self.heuristicSearch(dfine,)
+            p, cmin = self.heuristicSearch()
         elif searchtype.startswith('multi'):
             if dfile is None:
                 error('path.search: multi heuristic search requires a dfile')
@@ -410,7 +452,7 @@ class path:
         dt = (ts2-ts1).total_seconds()
         print('seconds per {:} paths: {:}'.format(nsamples, float(dt)))
         print('seconds per path: {:}'.format(float(dt)/nsamples))
-        save_timing(searchtype,PCNAME,float(dt)/nsamples)
+        save_timing(dfile,searchtype,PCNAME,float(dt)/nsamples)
         return p,cmin
 
     def sampleSearch(self,dfile=None,nsamples=977):
@@ -489,16 +531,18 @@ class path:
         pmin = []
         for p in piter:  # piter returns list of point indices
             idxpath = list(p)
+            print('checking path: ', idxpath)
             n += 1
             c = 0.0 #accumulate cost along path
             tmpTrajList = []
             for i in range(len(idxpath)-1):
                 # build next trajectory
-                row,col = idx2ij(p[i])
-                p1 = point2D(row,col)
-                row,col = idx2ij(p[i+1])
-                p2 = point2D(row,col)
-                tr = trajectory2D(p1,p2)
+                #row,col = idx2ij(p[i])
+                #p1 = point2D(row,col)
+                #row,col = idx2ij(p[i+1])
+                #p2 = point2D(row,col)
+                #tr = trajectory2D(p1,p2)
+                tr = self.Cm.m[i][i+1]
                 tr.constrain_A()
                 tmpTrajList.append(tr)
                 if costtype == 'energy':
@@ -586,23 +630,32 @@ class path:
         cmin = 99999999999
         cmax = 0
         maxTies = 0
-        nperstart = nsearch//(N*N)
-        for i in range(N*N): # go through the start pts
-            if i%2000==0:
-                print('multiple heuristic searches: ',i)  #I'm alive
-            # go through the N^2 start points with equal number at each
-            ip,jp = idx2ij(i)  # define the start point
-            self.sr = ip
-            self.sc = jp
+        if nsearch > N*N:  # for big enough searches, allocate same # to all start points
+            nperstart = nsearch//N*N
+            USESTPT = True
+        else:
+            nperstart = nsearch   # if less, just pick random start points
+            USESTPT = False
+        for i in range(N*N-1): # go through the start pts (-1 for trajs)
+            if USESTPT:
+                if i%2000==0:
+                    print('multiple heuristic searches: ',i)  #I'm alive
+            else:
+                print('searching starting point:',i)
             for m in range(nperstart): # do each start pt this many times
                 # reset search info
-                self.mark = [True for x in range(N*N)]
-                count = 0
-                self.mark[i] = False # mark our starting point
+                if not USESTPT:
+                    # a random start point
+                    startPtIdx = random.randint(0,N*N-1)
+                else:
+                    startPtIdx = i
+                print('marking: ', startPtIdx)
+                self.mark[startPtIdx] = False # mark our starting point
                 self.Tcost = 0.0
+                count = 0
 
                 # do the search
-                pself,c = self.heuristicSearch() #including random tie breakers
+                pself,c = self.heuristicSearch(startPtIdx) #including random tie breakers
 
                 if pself.maxTiesHSearch > maxTies:
                     maxTies = pself.maxTiesHSearch
@@ -623,24 +676,57 @@ class path:
         df.metadata.d['Min Cost']=cmin
         df.metadata.d['Max Cost']=cmax
         df.metadata.d['Max Ties']=maxTies
-        print('Lowest cost path: ', pmin)
-        print('path cost: ', cmin)
-        print('Highest cost path: ', pmax)
-        print('path cost: ', cmax)
+        print('min/max path cost: ', cmin,cmax)
+        #print('Lowest cost path: ', pmin)
+        #print('Highest cost path: ', pmax)
         print('Max # of ties: ',maxTies)
+
+        # save a csv file for tie histogram
+        MULTIHISTO = True
+        if MULTIHISTO:
+            destfolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
+            if destfolder[-1] != '/':
+                destfolder.append('/')
+            tfname = destfolder+'ties_info_'+ df.hashcode+'.csv'
+            fp = open (tfname, 'w')
+            #print('Distribution of tie choices: (',len(self.path),' points in path)',file=fp)
+            #print('\n  tie rank    |  how many times',file=fp)
+            #print('----------------------------------------',file=fp)
+            #sum = 0
+            #medianflag = True
+            fmtstring1 = '{:8d} , {:8d} '
+            #fmtstring2 = '{:8d}     |     {:8d} << median'
+            median=0
+            for i,n in enumerate(self.tie_freq):
+                median += n
+            median /=2
+            df.metadata.d['Median Ties']=median
+            for i,n in enumerate(self.tie_freq):
+                if i>1:
+                    if int(n) != 0:
+                        logval = np.log10(float(n))
+                    else:
+                        logval = -1
+                    #print(fmtstring1.format(i,int(n),logval),file=fp)
+                    print(f"{i:8}   |    {int(n):8}    |    {logval:8.2f}",file=fp)
+            fp.close()
+
+
         df.close()
         # return path object, float
         return pmin,pmin.Tcost
 
-    def heuristicSearch(self):  # path class
+    def heuristicSearch(self,startptidx):  # path class
         # add to self.path[] one traj at a time greedily
-        crow = self.sr*N + self.sc  # starting point in cost matrix
+        sr, sc = idx2ij(startptidx)
+        crow = sr*N+sc  # starting point in cost matrix
+        firstrow = crow # just the row #
         maxTies = 0 # keep track of highest # of tie costs
-        firstrow = self.sr*N + self.sc
         self.idxpath = []  # list if index points
         self.path = [] # list of trajectories
         self.Tcost = 0.0 # total path cost
-        while len(self.path) < N*N-1: # build path up one pt at a time
+        self.mark = [True for x in range(N*N)]
+        while len(self.path) < N*N: # build path up one pt at a time
             edge_next_tr = []   # next point by trajectory
             edge_costs = []  # cost of branch/traj to next point
 
@@ -649,6 +735,8 @@ class path:
                 if self.mark[ccol]:  # only unvisited
                     # look at all unvisited branches leaving current pt
                     ctraj = self.Cm.m[crow][ccol]
+                    print('\ncrow,ccol:',crow,ccol)
+                    ctraj.aprtr('pull tr from Cm')
                     if ctraj.valid: # don't do self transitions
                         if costtype == 'energy':
                             ccost = ctraj.e_cost # now pre-computed
@@ -659,11 +747,12 @@ class path:
                         #print('  cost:',ccost)
                         edge_next_tr.append(ctraj) # collect all branches out
                         edge_costs.append(ccost)   # costs of these branches
+
             # now we have to choose a random branch having min cost
             if len(edge_next_tr)==0:
                 error('somethings wrong: i cant find a next node!')
             minCost = min(edge_costs) # will be either a time or energy cost
-            epsilon = 0.02*minCost  # within 5% is a tie
+            epsilon = 0.02*minCost  # within 2% is a tie
             tiebreakerlist = []
             costTmpList = []
 
@@ -686,8 +775,19 @@ class path:
                     print('minCost:', minCost)
                     x = input('?...')
                     print('\n\n')
-            if len(tiebreakerlist)>maxTies:
-                maxTies = len(tiebreakerlist)
+            #####
+            #  Collect stats on the tiebrakkerlist
+            #####
+            L = len(tiebreakerlist)
+            #error condition checks
+            if L < 1:
+                error('search.select_next: no next trajs identified yet.')
+            if L>maxTies:
+                maxTies = L
+            if L > MAXTIEHISTO-1:  # pile all bigger ties into last bin
+                L = MAXTIEHISTO-1
+            self.tie_freq[L] += 1  # count how many ties with each multiplicity L
+
 
             # pick a random entry from the ties
             newtraj = random.choice(tiebreakerlist)
@@ -719,8 +819,11 @@ class path:
             self.maxTiesHSearch = maxTies # save this (multi-hsearch will max(max(ties)))
         # don't forget the last point in the path
         t = self.path[-1]
-        pathendpt = ij2idx(t.p2.row,t.p2.col)
-        self.idxpath.append(pathendpt)
+        pathendptidx = ij2idx(t.p2.row,t.p2.col)
+        self.idxpath.append(pathendptidx)
+        print('2D heuristic path search completed!')
+        print('{:} Total path cost ({:}) = {:8.2f}: '.format(self.searchtype,costtype,self.Tcost))
+        print('idxpath: ', self.idxpath)
         #return path object, float
         return self, self.Tcost
 
@@ -794,6 +897,7 @@ class path:
         return fig
 
     def plotOnePath(self,fig):
+        # get endpoints for arrows
         x_values = [traj.p1.x for traj in self.path]  # starting values
         y_values = [traj.p1.v for traj in self.path]
         x_values.append(self.path[-1].p2.x)
@@ -825,7 +929,7 @@ class path:
             color='red'
         )
 
-
+        # get curves for each arc
         cx, cy = self.compute_curves(-1) #compute trajectory path
         ax.plot(cx,cy,color='blue')
         axlim = 2

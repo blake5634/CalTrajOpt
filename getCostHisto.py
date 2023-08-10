@@ -21,7 +21,7 @@ def main(args):
     files = os.listdir(datadir)
     csvfiles = []
     for f in files:
-        if '.csv' in f:
+        if '.csv' in f and 'ties_info' not in f:
             csvfiles.append(f)
 
     hashstr = input('Enter first 4 characters of the hash from the filename:')
