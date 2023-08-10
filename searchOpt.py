@@ -60,13 +60,19 @@ def main(args):
 
     #  keep a "log book"
 
-    now = dt.datetime.now()
-    dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
-    logentry = '{:}, {:}, {:},  RQ: {:}'.format(dtstring,df.hashcode, notes, df.metadata.d['ResearchQuestion'])
+    logdir = dataFolder+'/writing/'
+    logfilename = 'work_logbook.txt'
 
-    f =open('search_logbook.txt','a')
-    print(logentry,file=f)
-    f.close()
+    q = df.metadata.d['ResearchQuestion']
+    if len(q)>0 and 'debug' not in q:  # skip junk files
+        now = dt.datetime.now()
+        dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
+        logentry = '{:}, {:}, {:},  RQ: {:}'.format(dtstring,df.hashcode, notes, q)
+        f =open(logdir+logfilename,'a')
+        print(logentry,file=f)
+        f.close()
+    else:
+        print(f'debugging detected. {df.hashcode} will not be logged to {logdir+logfilename}')
 
     print('your data file hash is:',df.hashcode)
     # graph the path
