@@ -37,9 +37,9 @@ def main(args):
 
     #nsearch = int(np.math.factorial(9)* 0.10)  # 10% of 3x3
     #nsearch = 1000000  # 1M
-    nsearch = 1000
+    nsearch = 5
 
-    cto.NPC = 50   #  # of simulation points in 0-dt time intervale
+    cto.NPC = 30   #  # of simulation points in 0-dt time intervale
     #
     ###################################################
 
@@ -61,11 +61,12 @@ def main(args):
     # instatntiate a path:
     p = cto.path(gt,c1)
     path2, cmin = p.search(SEARCHT, dfile=df, nsamples=nsearch)
-
+    print('Optimal path returned: (tra)', path2.path)
+    print('Optimal path returned: (idx)', path2.idxpath)
     # is it a valid path?
     #p.check()
 
-    notes = f"{gridtype} grid, {SEARCHT}, cost: {cmin} (cto.costtype)"
+    notes = f"{gridtype} grid, {SEARCHT}, cost: {cmin:8.1f} ({cto.costtype})"
 
     #  keep a "log book"
 
@@ -79,7 +80,7 @@ def main(args):
     print(logentry,file=f)
     f.close()
 
-    print('your data file hash is:',df.hashcode)
+    print('\n\n               your data file hash is:',df.hashcode)
     #graph the path
     path2.plot(-1,notes)
     #p.plot(idx)

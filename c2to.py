@@ -330,41 +330,32 @@ class Cm: # matrix full of trajectory2D objs
         nselftr = 0
         print('starting fill...{:}x{:}'.format(N,N))
         if self.randgrid:  # need to store a point for each col
-            colpoints = [] # store the randomized point for each col (just once)
-            for i2 in range(N):  # for all 2nd points
-                for j2 in range(N):
-                    p2 = grid.gr[i2][j2]  # i2,j2 have same end point p2
-                    p2.randomize()   #only randimize ONCE per row
-                    colpoints.append(p2)
-        for i1 in range(N):  # go through first points
-            for j1 in range(N):
-                p1 = grid.gr[i1][j1]  # i1,j1 is starting pt w/ same p1
-                if self.randgrid:
-                    p1.randomize() # only once per col
-                for i2 in range(N):  # for all 2nd points
-                    for j2 in range(N):
-                        if self.randgrid:
-                            p2=colpoints[i2*N+j2]  # i2,j2 have same end point p2
-                        else:
-                            p2 = grid.gr[i2][j2]
-                        m=max(i1,j1,i2,j2)
-                        if m>N-1:
-                            error('index too big: {:}/{:}'.format(m,N))
-                        r = ij2idx(i1,j1)  # point to row and col
-                        c = ij2idx(i2,j2)  # of the cost matrix
-                        t = trajectory2D(p1,p2)
-                        if (p1.x == p2.x and p1.v == p2.v):
-                            nselftr += 1
-                            t.valid = False  # eliminate self transitions
-                        else:  # compute the two costsF
-                            #t.compute(DT_TEST) #get coeffs
-                            t.constrain_A()    #constrain for Amax
-                            a = t.timeEvolution(ACC_ONLY=True)
-                            #compute traj costs
-                            t.cost_e(a)
-                            t.cost_t()
-
-                        self.m[r][c] = t   # store the trajectory
+            # go through the grid and randomize their x,v
+            for r in range(N):  # for all 2nd points
+                for c in range(N):
+                    p1 = grid.gr[r][c]
+                    p1.randomize()
+                    grid.gr[r][c] = p1
+        # now get a tr (and costs) for all possible transitions (row x col)
+        for i1 in range(N*N):
+            for j1 in range(N*N):
+                r1,c1 = idx2ij(i1)
+                r2,c2 = idx2ij(j1)
+                p1 = grid.gr[r1][c1]
+                p2 = grid.gr[r2][c2]
+                # we now have p1 and p2
+                t = trajectory2D(p1,p2)
+                if (p1.x == p2.x and p1.v == p2.v): # robust to random pts
+                    nselftr += 1
+                    t.valid = False  # eliminate self transitions
+                else:  # compute the two costsF
+                    #t.compute(DT_TEST) #get coeffs
+                    t.constrain_A()    #constrain for Amax
+                    a = t.timeEvolution(ACC_ONLY=True)
+                    #compute traj costs
+                    t.cost_e(a)
+                    t.cost_t()
+                self.m[i1][j1] = t   # store the trajectory
         print('done with fill...')
         print('# of self-state (invalid) transitions: ',nselftr, ' (expected N*N): ', N*N)
 
@@ -540,6 +531,7 @@ class path:
         pmin = []
         for p in piter:  # piter returns list of point indices
             idxpath = list(p)
+            print('checking path: ', idxpath)
             n += 1
             c = 0.0 #accumulate cost along path
             tmpTrajList = []
@@ -638,23 +630,32 @@ class path:
         cmin = 99999999999
         cmax = 0
         maxTies = 0
-        nperstart = nsearch//(N*N)
-        for i in range(N*N): # go through the start pts
-            if i%2000==0:
-                print('multiple heuristic searches: ',i)  #I'm alive
-            # go through the N^2 start points with equal number at each
-            ip,jp = idx2ij(i)  # define the start point
-            self.sr = ip
-            self.sc = jp
+        if nsearch > N*N:  # for big enough searches, allocate same # to all start points
+            nperstart = nsearch//N*N
+            USESTPT = True
+        else:
+            nperstart = nsearch   # if less, just pick random start points
+            USESTPT = False
+        for i in range(N*N-1): # go through the start pts (-1 for trajs)
+            if USESTPT:
+                if i%2000==0:
+                    print('multiple heuristic searches: ',i)  #I'm alive
+            else:
+                print('searching starting point:',i)
             for m in range(nperstart): # do each start pt this many times
                 # reset search info
-                self.mark = [True for x in range(N*N)]
-                count = 0
-                self.mark[i] = False # mark our starting point
+                if not USESTPT:
+                    # a random start point
+                    startPtIdx = random.randint(0,N*N-1)
+                else:
+                    startPtIdx = i
+                print('marking: ', startPtIdx)
+                self.mark[startPtIdx] = False # mark our starting point
                 self.Tcost = 0.0
+                count = 0
 
                 # do the search
-                pself,c = self.heuristicSearch() #including random tie breakers
+                pself,c = self.heuristicSearch(startPtIdx) #including random tie breakers
 
                 if pself.maxTiesHSearch > maxTies:
                     maxTies = pself.maxTiesHSearch
@@ -715,15 +716,17 @@ class path:
         # return path object, float
         return pmin,pmin.Tcost
 
-    def heuristicSearch(self):  # path class
+    def heuristicSearch(self,startptidx):  # path class
         # add to self.path[] one traj at a time greedily
-        crow = self.sr*N + self.sc  # starting point in cost matrix
+        sr, sc = idx2ij(startptidx)
+        crow = sr*N+sc  # starting point in cost matrix
+        firstrow = crow # just the row #
         maxTies = 0 # keep track of highest # of tie costs
-        firstrow = self.sr*N + self.sc
         self.idxpath = []  # list if index points
         self.path = [] # list of trajectories
         self.Tcost = 0.0 # total path cost
-        while len(self.path) < N*N-1: # build path up one pt at a time
+        self.mark = [True for x in range(N*N)]
+        while len(self.path) < N*N: # build path up one pt at a time
             edge_next_tr = []   # next point by trajectory
             edge_costs = []  # cost of branch/traj to next point
 
@@ -732,7 +735,7 @@ class path:
                 if self.mark[ccol]:  # only unvisited
                     # look at all unvisited branches leaving current pt
                     ctraj = self.Cm.m[crow][ccol]
-                    print('crow,ccol:',crow,ccol)
+                    print('\ncrow,ccol:',crow,ccol)
                     ctraj.aprtr('pull tr from Cm')
                     if ctraj.valid: # don't do self transitions
                         if costtype == 'energy':
@@ -816,8 +819,11 @@ class path:
             self.maxTiesHSearch = maxTies # save this (multi-hsearch will max(max(ties)))
         # don't forget the last point in the path
         t = self.path[-1]
-        pathendpt = ij2idx(t.p2.row,t.p2.col)
-        self.idxpath.append(pathendpt)
+        pathendptidx = ij2idx(t.p2.row,t.p2.col)
+        self.idxpath.append(pathendptidx)
+        print('2D heuristic path search completed!')
+        print('{:} Total path cost ({:}) = {:8.2f}: '.format(self.searchtype,costtype,self.Tcost))
+        print('idxpath: ', self.idxpath)
         #return path object, float
         return self, self.Tcost
 
