@@ -25,8 +25,8 @@ def main(args):
     ###################################################
     #    Search type and size
     #
-    gridtype = 'random'
-    #gridtype = 'rectangular'
+    #gridtype = 'random'
+    gridtype = 'rectangular'
 
     cto.N = 4
     cto.M = 16
@@ -66,7 +66,7 @@ def main(args):
     # is it a valid path?
     #p.check()
 
-    notes = f"{gridtype} grid, {SEARCHT}, cost: {cmin:8.1f} ({cto.costtype})"
+    notes = f"{gridtype} grid, {SEARCHT}, cost: {cmin:8.1f} ({cto.costtype})\n      ({df.hashcode})"
 
     #  keep a "log book"
 
