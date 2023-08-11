@@ -72,18 +72,19 @@ def main(args):
 
     #  keep a "log book"
 
+    logdir = dataFolder+'/writing/'
+    logfilename = 'work_logbook.txt'
+
     q = df.metadata.d['ResearchQuestion']
-    if len(q) > 0 or 'debug' not in q:
+    if len(q)>0 and 'debug' not in q:  # skip junk files
         now = dt.datetime.now()
         dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
-        logentry = '{:}, {:}, {:},  RQ: {:}'.format(dtstring,df.hashcode, notes.replace('\n',''), q)
-        logdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
-        logname = 'work_logbook.txt'
-        f =open(logdir+logname,'a')
+        logentry = '{:}, {:}, {:},  RQ: {:}'.format(dtstring,df.hashcode, notes, q)
+        f =open(logdir+logfilename,'a')
         print(logentry,file=f)
         f.close()
     else:
-        print(f"debugging detected: {df.hashcode} will not be logged in {logname} file")
+        print(f'debugging detected. {df.hashcode} will not be logged to {logdir+logfilename}')
 
     print('\n\n               your data file hash is:',df.hashcode)
     #graph the path

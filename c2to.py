@@ -65,12 +65,17 @@ def configure(fp=None):
         if parname == 'startcol':
             startcol = int(v)
 
-def ij2idx(i,j):
+def ij2idx(i,j):   #  0-N*N-1
     return i*N+j
-def idx2ij(idx):
+def idx2ij(idx):   #  0-N, 0-N
     i = idx//N
     j = idx-N*i
     return i,j
+
+def PtRcFromIdx(idx):
+    r = idx//N
+    c = idx = N*r
+    return r,c
 
 def predict_timing(df, searchtype, nsamp):
     #
@@ -133,11 +138,48 @@ class grid2D:
     def __init__(self, N):
         self.N = N
         self.gr = []
+        self.randgrid = False
+        self.fromFile = False
         for i in range(self.N):
             row = []
             for j in range(self.N):
                 row.append(point2D(i,j))
             self.gr.append(row)
+
+    def savePoints2D(self,df):   # save points generated into a file
+        if not self.randgrid:
+            error('savePoints2D: Do not save points if they are not random')
+        # each entry in Cm is a trajectory2D  we need only store p1 and p2
+        it =str(type(5))
+        ft =str(type(3.14159))
+        df.metadata.d['Types'] = [it,it,ft,ft]
+        df.metadata.d['Names'] = ['i1','j1','x1','v1']
+        df.metadata.d['Ncols'] = len(df.metadata.d['Names'])
+        df.open('w')
+        # write out key info for each point.
+        for i in range(N):
+            for j in range(N):
+                p1 = self.gr[i][j]
+                row = [i,j, p1.x, p1.v ]
+                df.write(row)
+        df.close()
+
+    def readPoints2D(self,df):  # read randomized points from a file
+        if not self.randgrid:
+            error('readPoints2D: Do not read in points if they are not random')
+        df.open('r')
+        # read in pair of points for each Cm.m entry and store trajectory.
+        ptindex = 0
+        for row in df.reader:
+            i = int(row[0])  # 0 -- N*N-1
+            j = int(row[1])
+            p1 = point2D(i,j)
+            p1.x = float(row[2])
+            p1.v = float(row[3])
+            self.gr[i][j]=p1
+            ptindex += 1
+        df.close()
+        self.fromFile = True
 
     def __repr__(self):
         txt = ''
@@ -149,7 +191,7 @@ class grid2D:
         return txt
 
 class point2D:
-    def __init__(self,i,j):
+    def __init__(self,i,j):  # index the spatial grid 0--N-1, 0--N-1
         if i > N or j>N or i<=-1 or j<=-1:
             error('point2D i,j is too big: '+str(i)+' '+str(j)+ ' /'+str(N))
         self.row = i
@@ -157,7 +199,7 @@ class point2D:
         self.x =     2*j/(N-1) - 1
         self.v = -1*(2*i/(N-1) - 1)
         if self.x < -1.05 or self.x > 1.05:
-            msg = 'point2D: Im creating bogus point coordinates: '
+            msg = "point2D: I'm creating bogus point coordinates: "
             msg += str(i) + '  '
             msg += str(j) + '  '
             msg += str(self.x) + '  '
@@ -329,13 +371,18 @@ class Cm: # matrix full of trajectory2D objs
     def fill(self, grid):
         nselftr = 0
         print('starting fill...{:}x{:}'.format(N,N))
-        if self.randgrid:  # need to store a point for each col
+        grid.randgrid = False # we do the setting of this and the randomization itself HERE
+        if grid.fromFile:  # we have read grid already from file and it must be random
+            grid.randgrid=True
+        elif self.randgrid:  # but we haven't read a file (gen from scratch)
+            grid.randgrid=True
             # go through the grid and randomize their x,v
             for r in range(N):  # for all 2nd points
                 for c in range(N):
                     p1 = grid.gr[r][c]
                     p1.randomize()
                     grid.gr[r][c] = p1
+
         # now get a tr (and costs) for all possible transitions (row x col)
         for i1 in range(N*N):
             for j1 in range(N*N):
@@ -531,17 +578,12 @@ class path:
         pmin = []
         for p in piter:  # piter returns list of point indices
             idxpath = list(p)
+            self.idxpath.append(idxpath)
             print('checking path: ', idxpath)
             n += 1
             c = 0.0 #accumulate cost along path
             tmpTrajList = []
             for i in range(len(idxpath)-1):
-                # build next trajectory
-                #row,col = idx2ij(p[i])
-                #p1 = point2D(row,col)
-                #row,col = idx2ij(p[i+1])
-                #p2 = point2D(row,col)
-                #tr = trajectory2D(p1,p2)
                 tr = self.Cm.m[i][i+1]
                 tr.constrain_A()
                 tmpTrajList.append(tr)
@@ -735,8 +777,8 @@ class path:
                 if self.mark[ccol]:  # only unvisited
                     # look at all unvisited branches leaving current pt
                     ctraj = self.Cm.m[crow][ccol]
-                    print('\ncrow,ccol:',crow,ccol)
-                    ctraj.aprtr('pull tr from Cm')
+                    #print('\ncrow,ccol:',crow,ccol)
+                    #ctraj.aprtr('pull tr from Cm')
                     if ctraj.valid: # don't do self transitions
                         if costtype == 'energy':
                             ccost = ctraj.e_cost # now pre-computed
