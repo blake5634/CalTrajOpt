@@ -25,11 +25,11 @@ def main(args):
     ###################################################
     #    Search type and size
     #
-    #gridtype = 'random'
-    gridtype = 'rectangular'
+    gridtype = 'random'
+    #gridtype = 'rectangular'
 
-    cto.N = 4
-    cto.M = 16
+    cto.N = 3
+    cto.M = cto.N*cto.N
     #SEARCHT = 'heuristic search' # greedy nearest neighbor
     #SEARCHT = 'brute force'   # enumerate all paths
     #SEARCHT = 'sampling search' # nsearch random paths
@@ -37,8 +37,10 @@ def main(args):
 
     #nsearch = int(np.math.factorial(9)* 0.10)  # 10% of 3x3
     #nsearch = 1000000  # 1M
-    nsearch = 5
+    nsearch = 4*np.math.factorial(cto.M)  # 4 searches from each starting pt
 
+    #cto.costtype = 'time'
+    cto.costtype = 'energy'
     cto.NPC = 30   #  # of simulation points in 0-dt time intervale
     #
     ###################################################
@@ -70,15 +72,18 @@ def main(args):
 
     #  keep a "log book"
 
-    now = dt.datetime.now()
-    dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
-    logentry = '{:}, {:}, {:},  RQ: {:}'.format(dtstring,df.hashcode, notes, df.metadata.d['ResearchQuestion'])
-
-    logdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
-    logname = 'work_logbook.txt'
-    f =open(logdir+logname,'a')
-    print(logentry,file=f)
-    f.close()
+    q = df.metadata.d['ResearchQuestion']
+    if len(q) > 0 or 'debug' not in q:
+        now = dt.datetime.now()
+        dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
+        logentry = '{:}, {:}, {:},  RQ: {:}'.format(dtstring,df.hashcode, notes.replace('\n',''), q)
+        logdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
+        logname = 'work_logbook.txt'
+        f =open(logdir+logname,'a')
+        print(logentry,file=f)
+        f.close()
+    else:
+        print(f"debugging detected: {df.hashcode} will not be logged in {logname} file")
 
     print('\n\n               your data file hash is:',df.hashcode)
     #graph the path
