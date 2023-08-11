@@ -155,6 +155,8 @@ class grid2D:
         df.metadata.d['Types'] = [it,it,ft,ft]
         df.metadata.d['Names'] = ['i1','j1','x1','v1']
         df.metadata.d['Ncols'] = len(df.metadata.d['Names'])
+        df.descript_str = 'randomGridPointSet' # standardize for point storage filename fields
+        df.metadata.d['Research Question'] = 'RandomGridPointSet' # standardize for RQ
         df.open('w')
         # write out key info for each point.
         for i in range(N):
@@ -173,6 +175,7 @@ class grid2D:
         for row in df.reader:
             i = int(row[0])  # 0 -- N*N-1
             j = int(row[1])
+            print(f"I'm creating point at {i}, {j}")
             p1 = point2D(i,j)
             p1.x = float(row[2])
             p1.v = float(row[3])
@@ -180,6 +183,8 @@ class grid2D:
             ptindex += 1
         df.close()
         self.fromFile = True
+        # return the file name from which the pts were read for the record
+        return df.name
 
     def __repr__(self):
         txt = ''
@@ -199,11 +204,7 @@ class point2D:
         self.x =     2*j/(N-1) - 1
         self.v = -1*(2*i/(N-1) - 1)
         if self.x < -1.05 or self.x > 1.05:
-            msg = "point2D: I'm creating bogus point coordinates: "
-            msg += str(i) + '  '
-            msg += str(j) + '  '
-            msg += str(self.x) + '  '
-            msg += str(self.v) + '  '
+            msg = f"point2D: I'm creating bogus point coordinates: {i} {j} {self.x} {self.v}"
             error(msg)
         self.tr = None
 
@@ -500,6 +501,7 @@ class path:
         print('seconds per {:} paths: {:}'.format(nsamples, float(dt)))
         print('seconds per path: {:}'.format(float(dt)/nsamples))
         save_timing(dfile,searchtype,PCNAME,float(dt)/nsamples)
+        p.datafile=dfile
         return p,cmin
 
     def sampleSearch(self,dfile=None,nsamples=977):
@@ -532,12 +534,11 @@ class path:
             tps.append(ftype) # the path cost's type
             names = []
             for i in range(N*N):
-                names.append('p{:}'.format(i))
+                names.append(f'p{i}')
             names.append('Cost')
             dfbf.metadata.d['Ncols'] = len(names)
             dfbf.metadata.d['Types'] = tps
             dfbf.metadata.d['Names'] = names
-            dfbf.metadata.d['Ncols'] = N*N+1
             dfbf.metadata.d['CostType'] = costtype
             dfbf.metadata.d['SearchType'] = self.searchtype
             dfbf.metadata.d['#samples'] = nsamples
@@ -657,7 +658,7 @@ class path:
         names.append('Cost')
         df.metadata.d['Types'] = tps
         df.metadata.d['Names'] = names
-        df.metadata.d['Ncols'] = N*N+1
+        df.metadata.d['Ncols'] = len(names)
         df.metadata.d['CostType'] = costtype # 'energy' or 'time'
         df.metadata.d['SearchType'] = self.searchtype # 'brute force', 'heuristic' etc.
         df.metadata.d['#samples'] = nsearch
@@ -672,26 +673,30 @@ class path:
         cmin = 99999999999
         cmax = 0
         maxTies = 0
-        if nsearch > N*N:  # for big enough searches, allocate same # to all start points
+        if nsearch > 2*N*N:  # for big enough searches, allocate same # to all start points
             nperstart = nsearch//N*N
-            USESTPT = True
+            MULTI_SEARCH_PER_PT = True
+            print(f'searching each start point {nperstart} times.')
         else:
             nperstart = nsearch   # if less, just pick random start points
-            USESTPT = False
-        for i in range(N*N-1): # go through the start pts (-1 for trajs)
-            if USESTPT:
+            MULTI_SEARCH_PER_PT = False
+            print(f'searching {nperstart} random start pts, once each.')
+
+        x = input('.....  db pause...')
+        for i in range(N*N-1): # go through the start pts
+            if MULTI_SEARCH_PER_PT:
                 if i%2000==0:
-                    print('multiple heuristic searches: ',i)  #I'm alive
+                    print('MH Search iteration: ',i)  #I'm alive
             else:
-                print('searching starting point:',i)
+                pass
             for m in range(nperstart): # do each start pt this many times
                 # reset search info
-                if not USESTPT:
+                if not MULTI_SEARCH_PER_PT:
                     # a random start point
                     startPtIdx = random.randint(0,N*N-1)
                 else:
                     startPtIdx = i
-                print('marking: ', startPtIdx)
+                print(f'TF: {MULTI_SEARCH_PER_PT} startpt: {startPtIdx} iteration: {m}')
                 self.mark[startPtIdx] = False # mark our starting point
                 self.Tcost = 0.0
                 count = 0
@@ -715,6 +720,8 @@ class path:
                     pmax = path(self.grid,self.Cm)
                     pmax.path = self.path
                     pmax.Tcost = c
+            if not MULTI_SEARCH_PER_PT:
+                break
         df.metadata.d['Min Cost']=cmin
         df.metadata.d['Max Cost']=cmax
         df.metadata.d['Max Ties']=maxTies
