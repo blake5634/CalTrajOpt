@@ -61,10 +61,9 @@ else:
     # create a datafile to store  random points
 
     df = bd.datafile('randomGridPointSet','BH','simulation')
-    dataFolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS'
+    dataFolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/PointSetsRandom'
     codeFolder = ''
     df.set_folders(dataFolder,codeFolder) # also creates filename
-    df.metadata.d['ResearchQuestion'] = 'RandomPointSet'
 
 
     #

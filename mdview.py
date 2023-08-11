@@ -10,7 +10,8 @@ import subprocess
 dirs = ['/home/blake/Sync/Research/CalTrajOpt_RESULTS',
         '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data',
         '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D-Round2',
-        '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data/Gold'
+        '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data/Gold',
+        '/home/blake/Sync/Research/CalTrajOpt_RESULTS/PointSetsRandom'
         ]
 
 datadir = 'Using list'
