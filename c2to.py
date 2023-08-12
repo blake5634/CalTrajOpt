@@ -485,9 +485,9 @@ class path:
             if dfile is None:
                 error('path.search: multi heuristic search requires a dfile')
             p, cmin = self.multiHSearch(dfile,nsamples)
-        elif searchtype.startswith('brute'):
+        elif searchtype.startswith('exh'):
             if dfile is None:
-                error('path.search: brute force search requires a dfile')
+                error('path.search: brute force (exhaustive) search requires a dfile')
             p, cmin = self.bruteForce(dfile=dfile)
         elif searchtype.startswith('sampling'):
             if dfile is None:
@@ -509,7 +509,7 @@ class path:
 
     def bruteForce(self,dfile=None,sampling=False,nsamples=0): # path class
         if self.searchtype.startswith('none'):
-            self.searchtype = 'brute force'
+            self.searchtype = 'exhaustive'
         n_all_paths = math.factorial(N*N)
         print('Starting {:} search: N={:}'.format(self.searchtype,N))
         if sampling:
@@ -660,7 +660,7 @@ class path:
         df.metadata.d['Names'] = names
         df.metadata.d['Ncols'] = len(names)
         df.metadata.d['CostType'] = costtype # 'energy' or 'time'
-        df.metadata.d['SearchType'] = self.searchtype # 'brute force', 'heuristic' etc.
+        df.metadata.d['SearchType'] = self.searchtype # 'exhaustive', 'heuristic' etc.
         df.metadata.d['#samples'] = nsearch
 
         #
@@ -939,7 +939,7 @@ class path:
         else:
             hashcode = ''
         fig = plt.figure()
-        plt.title('Path through Grid: minimize {:}  Amax = {:2.1f}\n            {:}'.format(costtype,AMAX,note))
+        plt.title('{:}'.format(note))
         plt.xlabel('X     ('+hashcode+')')
         plt.ylabel('\dot{X}')
         plt.grid(True)

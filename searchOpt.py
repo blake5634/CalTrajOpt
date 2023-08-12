@@ -71,11 +71,13 @@ def main(args):
     #
     cto.N = 3
     cto.M = cto.N*cto.N
+    N = cto.N
+
     #
     #   Choose search type
     #
     #SEARCHT = 'heuristic search' # greedy nearest neighbor
-    SEARCHT = 'brute force'   # enumerate all paths
+    SEARCHT = 'exhaustive'   # enumerate all paths (formerly 'brute force')
     #SEARCHT = 'sampling search' # nsearch random paths
     #SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
     #
@@ -89,8 +91,8 @@ def main(args):
     #
     #   Choose cost type
     #
-    #cto.costtype = 'time'
-    cto.costtype = 'energy'
+    cto.costtype = 'time'
+    #cto.costtype = 'energy'
     cto.NPC = 30   #  # of simulation points in 0-dt time interval
     #
     ##########################################################################
@@ -109,10 +111,11 @@ def main(args):
     if OP_MODE == 'generate':
         if gridtype != 'random':
             cto.error('Somethings wrong with search config: generate not random')
-        df = bd.datafile('randomGridPointSet','BH','simulation')
+        df = bd.datafile(f'2DrandomGrid{N}x{N}PointSet','BH','simulation')
         codeFolder = ''
         df.set_folders(pointsDataFolder,codeFolder) # also creates filename
         c1.fill(gt)  # randomize
+        df.metadata.d['grid info'] = f'{N}x{N} random grid, {N*N} pts.'
         gt.savePoints2D(df)
         print(f'Random pts saved to {df.name}')
         notes = f'generated random points file: {cto.N}x{cto.N}'
@@ -140,13 +143,12 @@ def main(args):
         print('Optimal path returned: (idx)', path2.idxpath)
         # is it a valid path?
         #p.check()
-        notes = f"{gridtype} grid, {SEARCHT}, cost: {cmin:8.1f} ({cto.costtype})"
+        notes = f"Search Result: {gridtype} grid, {SEARCHT}, cost: {cmin:8.1f} ({cto.costtype})"
         #  keep a "log book"
         logentry(dfw,notes)
         print('\n\n               your search results file hash is:',dfw.hashcode)
         # graph the optimal search result (best path)
         path2.plot(-1,notes)
-        plt.show()
 
 
 def logentry(df,notes):
