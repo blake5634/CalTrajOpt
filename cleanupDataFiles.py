@@ -7,6 +7,77 @@ import sys
 import brl_data.brl_data as bd
 
 def main(args):
+
+    #  all the dirs we might find data files
+    dirs = ['/home/blake/Sync/Research/CalTrajOpt_RESULTS',
+            '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data',
+            '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D-Round2',
+            '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data/Gold',
+            '/home/blake/Sync/Research/CalTrajOpt_RESULTS/PointSetsRandom',
+            '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing'
+            ]
+    if len(args) > 1: # cmd line delete specific hash files and purge from log
+        myf = bd.finder()
+        myf.set_dirs(dirs)
+        fds = []
+        hlist = args[1:]
+        for h in hlist:
+            keys = [h]
+            fds += myf.findh(keys) # get all files with this hash
+        print(f' I found {len(fds)} files matching {hlist}:')
+        i=0
+        for fd in fds:
+            i+=1
+            print(f'    {i}: [{fd[0]}/{fd[1]}]')
+        x = input('\n\n          OK to delete these files?? ... (y/N)')
+        if x.lower() == 'y':
+            for fd in fds:
+                print(' ... removing ',fd[1])
+                os.remove(fd[0]+'/'+fd[1])
+        else:
+            print('removing canceled')
+        #
+        x = input(f'\n\n          OK to purge {hlist} from log files?? ... (y/N)')
+        if x.lower() == 'y':
+            # now purge entries from the logs
+            wlog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/work_logbook.txt'
+            ilog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/image_log.txt'
+            logs = [wlog, ilog]
+            for lf in logs:
+                justname = lf.split('/')[-1]
+                f = open(lf,'r')
+                keeplines = []
+                deletelines = []
+                for line in f:
+                    save = True
+                    for h in hlist:
+                        if h in line:
+                            save = False
+                    if save:
+                        keeplines.append(line)
+                    else:
+                        deletelines.append(line)
+                print(f'\n Deleting {len(deletelines)} {hlist} entries from {justname}')
+                f.close()
+                for l in deletelines:
+                    print('deleting: ',l.strip())
+
+                # confirm y/N ??
+
+                # now do it
+                f = open(lf,'w')
+                for l in keeplines:
+                    print(l.strip(),file=f)
+                f.close()
+                print(f' {len(deletelines)} lines purged from {justname}.')
+        else:
+            print(' purging logs canceled.')
+
+        quit()
+
+    # without cmd line args:
+    #   auto mode based on metadata and Research Question
+
     #####################################################################
     #
     # get all the files
@@ -63,6 +134,7 @@ def main(args):
 
     if len(remlist) > 0:
         print('\n\nPlanning to remove the following file names (.jason and .csv):')
+        print('     Reason: Research Question is empty or contains "debug"')
         for fn in remlist:
             print(fn)
 
@@ -75,7 +147,9 @@ def main(args):
             print('removing canceled')
 
     if len(remlistCSV) > 0:
-        print('\n\nPlanning to remove the following .csv files which have no metadata:')
+        print('\n\nPlanning to remove the following .csv files')
+        print('     Reason: they have no metadata file (often ^C or crash)')
+
         for fn in remlistCSV:
             print(fn)
 
@@ -89,10 +163,6 @@ def main(args):
             print('removing canceled')
 
     print('.. Done')
-
-
-
-
 
 
 if __name__ ==  '__main__':
