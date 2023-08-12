@@ -69,7 +69,7 @@ def main(args):
     #
     #    Configure the job
     #
-    cto.N = 3
+    cto.N = 4
     cto.M = cto.N*cto.N
     N = cto.N
 
@@ -77,22 +77,22 @@ def main(args):
     #   Choose search type
     #
     #SEARCHT = 'heuristic search' # greedy nearest neighbor
-    SEARCHT = 'exhaustive'   # enumerate all paths (formerly 'brute force')
+    #SEARCHT = 'exhaustive'   # enumerate all paths (formerly 'brute force')
     #SEARCHT = 'sampling search' # nsearch random paths
-    #SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
+    SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
     #
     #   Choose search size
     #
     #nsearch = int(np.math.factorial(9)* 0.10)  # 10% of 3x3
     #nsearch = 1000000  # 1M
-    #nsearch = 4*cto.M   # 4 searches from each starting pt
-    nsearch = 10
+    nsearch = 4*cto.M   # 4 searches from each starting pt
+    #nsearch = 10
 
     #
     #   Choose cost type
     #
-    cto.costtype = 'time'
-    #cto.costtype = 'energy'
+    #cto.costtype = 'time'
+    cto.costtype = 'energy'
     cto.NPC = 30   #  # of simulation points in 0-dt time interval
     #
     ##########################################################################
@@ -118,9 +118,9 @@ def main(args):
         df.metadata.d['grid info'] = f'{N}x{N} random grid, {N*N} pts.'
         gt.savePoints2D(df)
         print(f'Random pts saved to {df.name}')
-        notes = f'generated random points file: {cto.N}x{cto.N}'
+        notes = f'generated random points file: {df.hashcode} {cto.N}x{cto.N}'
         logentry(df,notes)
-        print('\n\n               your points data file hash is:',df.hashcode)
+        print(f'\n\n               your points data file hash is:',df.hashcode)
 
     elif OP_MODE == 'search': # search mode with grid or read-in points
         if gridtype == 'random': # we should read from file for repeatability
@@ -128,12 +128,12 @@ def main(args):
             dfr = bd.datafile('','','') #'' ok for reading
             dfr.set_folders('','') # '' ok for reading
             dfr.name = pointsFilename
-            pointSourceFileName = gt.readPoints2D(dfr)  #read in the set of random points
+            pointSourceHash = gt.readPoints2D(dfr)  #read in the set of random points
         c1.fill(gt) # calc trajectories and costs after points reading
         dfw = bd.datafile('2Dsearching','BH','simulation')
         dfw.set_folders(DataFolder,'')
         if gridtype=='random':
-            dfw.metadata.d['Points Data Source'] = pointSourceFileName
+            dfw.metadata.d['Points Data Source'] = pointsHash
         q = input('Research Question for this search:')
         dfw.metadata.d['Research Question'] = q
         # instantiate a path:
@@ -143,10 +143,15 @@ def main(args):
         print('Optimal path returned: (idx)', path2.idxpath)
         # is it a valid path?
         #p.check()
-        notes = f"Search Result: {gridtype} grid, {SEARCHT}, cost: {cmin:8.1f} ({cto.costtype})"
+        if gridtype=='random':
+            notes = f"Search Result: {gridtype} grid ({pointSourceHash}), {SEARCHT}, cost: {cmin:8.1f} ({cto.costtype})"
+            print('\n\n               your search results file hash is: {dfw.hashcode} using grid {pointSourceHash}.')
+        else:
+            notes = f"Search Result: {gridtype} grid, {SEARCHT}, cost: {cmin:8.1f} ({cto.costtype})"
+            print('\n\n               your search results file hash is: {dfw.hashcode}.')
         #  keep a "log book"
         logentry(dfw,notes)
-        print('\n\n               your search results file hash is:',dfw.hashcode)
+        print('\n\n               your search results file hash is: {dfw.hashcode} using grid {pointSourceHash}.')
         # graph the optimal search result (best path)
         path2.plot(-1,notes)
 

@@ -134,6 +134,30 @@ def save_timing(df, searchname,systemName,rate):
     return
 
 
+def plotSave(fig, dpi, imagedir, imagename):
+    #fig = plt.gcf()
+    #datad = string path to data directory
+    if imagedir[-1] != '/':
+        imagedir += '/'
+    imagepath = imagedir+imagename
+    if '.png' not in imagepath:
+        imagepath += '.png'
+    fig.savefig(imagepath,dpi=dpi)
+    print('your plot is saved to: ',imagepath)
+
+    ####  keep a "log book" if saved
+    dim = '6D'
+    notes = '{:}, {:}'.format(dim,imagepath)
+    now = datetime.datetime.now()
+    dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
+    logentry = '{:}, plot saved: {:}'.format(dtstring,notes)
+    fdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
+    f =open(fdir + 'image_log.txt','a')
+    print(logentry,file=f)
+    f.close()
+    ####
+
+
 class grid2D:
     def __init__(self, N):
         self.N = N
@@ -184,7 +208,7 @@ class grid2D:
         df.close()
         self.fromFile = True
         # return the file name from which the pts were read for the record
-        return df.name
+        return df.hashcode
 
     def __repr__(self):
         txt = ''
@@ -987,6 +1011,20 @@ class path:
 
     def plotDone(self):
         plt.show()
+        df = self.datafile
+        template = f'______________{df.hashcode}.png'
+        print('filename template: ',template)
+        nroot = input('enter name root: (<enter> to not save) ')
+        if len(nroot)>0:
+            nroot += '_' # separate the hash
+            imgdir = df.folder+'writing/'
+            imgname = nroot + df.hashcode
+            my_dpi = 200
+            plotSave(plt.gcf(), my_dpi, imgdir, imgname)
+
+        else:
+            print('plot image NOT saved')
+
 
 
 
