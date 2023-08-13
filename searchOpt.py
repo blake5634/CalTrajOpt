@@ -69,7 +69,7 @@ def main(args):
     #
     #    Configure the job
     #
-    cto.N = 4
+    cto.N = 3
     cto.M = cto.N*cto.N
     N = cto.N
 
@@ -85,13 +85,14 @@ def main(args):
     #
     #nsearch = int(np.math.factorial(9)* 0.10)  # 10% of 3x3
     #nsearch = 1000000  # 1M
-    nsearch = 4*cto.M   # 4 searches from each starting pt
+    nsearch = 4*N*N   # 4 searches from each starting pt
+    print(f'Test: {nsearch} searches planned')
     #nsearch = 10
 
     #
     #   Choose cost type
     #
-    #cto.costtype = 'time'
+    cto.costtype = 'time'
     cto.costtype = 'energy'
     cto.NPC = 30   #  # of simulation points in 0-dt time interval
     #
@@ -116,7 +117,7 @@ def main(args):
         df.set_folders(pointsDataFolder,codeFolder) # also creates filename
         c1.fill(gt)  # randomize
         df.metadata.d['grid info'] = f'{N}x{N} random grid, {N*N} pts.'
-        gt.savePoints2D(df)
+        gt.savePoints2D(df) #this will set the 'Research Question' to "RandomGridPointSet"
         print(f'Random pts saved to {df.name}')
         notes = f'generated random points file: {df.hashcode} {cto.N}x{cto.N}'
         logentry(df,notes)
@@ -134,6 +135,8 @@ def main(args):
         dfw.set_folders(DataFolder,'')
         if gridtype=='random':
             dfw.metadata.d['Points Data Source'] = pointsHash
+        else:
+            dfw.metadata.d['Points Data Source'] = 'Regular Grid'
         q = input('Research Question for this search:')
         dfw.metadata.d['Research Question'] = q
         # instantiate a path:
@@ -145,13 +148,12 @@ def main(args):
         #p.check()
         if gridtype=='random':
             notes = f"Search Result: {gridtype} grid ({pointSourceHash}), {SEARCHT}, cost: {cmin:8.1f} ({cto.costtype})"
-            print('\n\n               your search results file hash is: {dfw.hashcode} using grid {pointSourceHash}.')
+            print(f'\n\n               your search results file hash is: {dfw.hashcode} using grid {pointSourceHash}.')
         else:
             notes = f"Search Result: {gridtype} grid, {SEARCHT}, cost: {cmin:8.1f} ({cto.costtype})"
-            print('\n\n               your search results file hash is: {dfw.hashcode}.')
+            print(f'\n\n               your search results file hash is: {dfw.hashcode}.')
         #  keep a "log book"
         logentry(dfw,notes)
-        print('\n\n               your search results file hash is: {dfw.hashcode} using grid {pointSourceHash}.')
         # graph the optimal search result (best path)
         path2.plot(-1,notes)
 
