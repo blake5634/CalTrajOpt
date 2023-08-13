@@ -90,7 +90,6 @@ def predict_timing(df, searchtype, nsamp):
     if os.path.isfile(filename):
         fd = open(filename,'r')
         d = json.load(fd)
-        print('n samples:',nsamp)
         try:
             t = d[key]
         except:
@@ -698,9 +697,9 @@ class path:
         cmax = 0
         maxTies = 0
         if nsearch > 2*N*N:  # for big enough searches, allocate same # to all start points
-            nperstart = nsearch//N*N
+            nperstart = nsearch//(N*N)
             MULTI_SEARCH_PER_PT = True
-            print(f'searching each start point {nperstart} times.')
+            print(f'searching the {N*N} start points {nperstart} times each.')
         else:
             nperstart = nsearch   # if less, just pick random start points
             MULTI_SEARCH_PER_PT = False
