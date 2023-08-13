@@ -147,10 +147,10 @@ def main(args):
         # is it a valid path?
         #p.check()
         if gridtype=='random':
-            notes = f"Search Result: {gridtype} grid ({pointSourceHash}), {SEARCHT}, cost: {cmin:8.1f} ({cto.costtype})"
+            notes = f"Search Result: Rand-grid({pointSourceHash}), {SEARCHT}, cost: {cmin:.1f} ({cto.costtype})"
             print(f'\n\n               your search results file hash is: {dfw.hashcode} using grid {pointSourceHash}.')
         else:
-            notes = f"Search Result: {gridtype} grid, {SEARCHT}, cost: {cmin:8.1f} ({cto.costtype})"
+            notes = f"Search Result: {gridtype} grid, {SEARCHT}, cost: {cmin:.1f} ({cto.costtype})"
             print(f'\n\n               your search results file hash is: {dfw.hashcode}.')
         #  keep a "log book"
         logentry(dfw,notes)
