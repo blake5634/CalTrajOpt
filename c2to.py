@@ -10,6 +10,7 @@ import datetime
 import brl_data.brl_data as bd
 import random
 import socket
+import time
 
 
 def error(msg):
@@ -65,6 +66,8 @@ def configure(fp=None):
         if parname == 'startcol':
             startcol = int(v)
 
+#  'i,j' 'r,c', 'row,col' are used kind of interchangeably
+#   to indicate point in rectangular grid ... sorry!
 def ij2idx(i,j):   #  0-N*N-1
     return i*N+j
 def idx2ij(idx):   #  0-N, 0-N
@@ -72,10 +75,13 @@ def idx2ij(idx):   #  0-N, 0-N
     j = idx-N*i
     return i,j
 
-def PtRcFromIdx(idx):
-    r = idx//N
-    c = idx = N*r
-    return r,c
+def pt2idx(pt):
+    return ij2idx(pt.row,pt.col)
+
+def idx2rc(idx):
+    # index to point row, col
+    # same as above
+    return idx2ij(idx)
 
 def predict_timing(df, searchtype, nsamp):
     #
@@ -350,9 +356,13 @@ class trajectory2D:
             a.append(self.xdd(self.dt))
             return a
 
-    #
     #   Energy cost: sum of squared acceleration
     def cost_e(self,a):
+        #
+        # Note: there is an analytical expression for this:
+        #  \int_0^{\delta t} \ddot{x} = 4a_2(\delta t) + 12a_2a_3(\delta t)^2 + 12a_3^2(\delta t)^3
+        #    (derived 8/14/23)
+        #
         if not self.computed and not self.constrained:
             error('Cant compute cost_e until trajectory is computed and constrained')
         c = 0.0
@@ -491,6 +501,7 @@ class path:
         #collect tie stats on this path
         self.maxTiesHSearch = -99999999  # most ties when greedy searching
         self.tie_freq = np.zeros(MAXTIEHISTO)  # histogram of how many ties of
+        self.costset = set()  # testing only
 
     def search(self,searchtype,dfile=None,nsamples=1000):
         self.searchtype = searchtype
@@ -526,6 +537,19 @@ class path:
         save_timing(dfile,searchtype,PCNAME,float(dt)/nsamples)
         p.datafile=dfile
         return p,cmin
+
+    def cost(self):  # path.cost()
+        c = 0.0
+        if costtype == 'time':
+            for t in self.path:
+                c += t.t_cost
+        elif costtype == 'energy':
+            for t in self.path:
+                c += t.e_cost
+        else:
+            error('path.cost() illegal cost type: ',costtype)
+        print('                                       tcost: ',c)
+        return c
 
     def sampleSearch(self,dfile=None,nsamples=977):
         return self.bruteForce(dfile=dfile,sampling=True,nsamples=nsamples)
@@ -564,7 +588,7 @@ class path:
             dfbf.metadata.d['Names'] = names
             dfbf.metadata.d['CostType'] = costtype
             dfbf.metadata.d['SearchType'] = self.searchtype
-            dfbf.metadata.d['#samples'] = nsamples
+            #dfbf.metadata.d['#samples'] = nsamples  SHOULD BE AUTO
 
             #
             dfbf.open()  # let's open the file (default is for writing)
@@ -599,44 +623,63 @@ class path:
         n = -1
         cmin = 99999999999
         cmax = 0
-        pmin = []
-        for p in piter:  # piter returns list of point indices
+        pmax = path(self.grid,self.Cm)   # storage for int results
+        pmin = path(self.grid, self.Cm)
+
+        itrct = -1
+        for p in piter:  # piter returns a whole "list" of point indices each time
+            itrct += 1
             idxpath = list(p)
-            self.idxpath.append(idxpath)
-            print('checking path: ', idxpath)
+            p = path(self.grid, self.Cm) # temp variable
+            p.idxpath = idxpath # use own idxpath for tmp idx path storage(!)
+            p.path = []  # use own path for tmp path storage(!)
+            iterct = -1
+            for i,ptidx in enumerate(p.idxpath[1:]): # list of points
+                iterct+=1
+                prvidx = p.idxpath[i]  # kind of actually "i-1" - b/c [1:]
+                tr = self.Cm.m[prvidx][ptidx] # each trajectory in path
+                p.path.append(tr) # store full path
+                #print('adding traj: ', tr)
+                #
+                # sanity check after start
+                if iterct > 0:
+                    pcurr = p.path[-1].p1
+                    pprev = p.path[-2].p2
+                    if pprev != pcurr: # check for error
+                        print(' prev.p2, curr.p1: ', pprev, pcurr)
+                        error(f'path trajectories dont connect! node #: {i}')
+            print('testing at iter:',itrct)
+            print('p.idxpath: ', p.idxpath)
+            #print('p.path: ', p.path)
+
+            c = p.cost()
+
+            print('cost: ', c)
+            #x=input('  <cr>')
+
+            if n%10 == 0:
+                    print('path ',n, ' cost: ', c) # I'm alive!
+            #print('checking path: ', p.idxpath)
             n += 1
-            c = 0.0 #accumulate cost along path
-            tmpTrajList = []
-            for i in range(len(idxpath)-1):
-                tr = self.Cm.m[i][i+1]
-                tr.constrain_A()
-                tmpTrajList.append(tr)
-                if costtype == 'energy':
-                    a = tr.timeEvolution(ACC_ONLY=True)
-                    c += tr.cost_e(a)
-                elif costtype == 'time':
-                    c += tr.cost_t()
-                else:
-                    error('unknown cost type: '+costtype)
-            if n%2000 == 0:
-                    print('path ',n) # I'm alive!
             if STOREDATA:
-                row = idxpath # list of int index pts
-                row.append(c)
-                dfbf.write(row)
+                dfrow = p.idxpath # list of int index pts
+                dfrow.append(c)
+                dfbf.write(dfrow)
             if c > cmax:
                 cmax = c
-                pmax = path(self.grid,self.Cm)
-                pmax.path = tmpTrajList
+                pmax.path = p.path
+                pmax.idxpath = p.idxpath
                 pmax.Tcost = c
                 nmax = n
             if c < cmin:
                 cmin = c
-                pmin = path(self.grid,self.Cm)
-                pmin.path = tmpTrajList
+                pmin.path = p.path
+                pmin.idxpath = p.idxpath
                 pmin.Tcost = c
                 nmin = n
-            #print(' path cost: {:4.2f}'.format(c))
+            if n%2000 == 0:
+                    print('path ',n, ' cost: ', c) # I'm alive!
+
             if not LOWMEM:
                 path_costs.append(c)
         if not LOWMEM:
@@ -664,6 +707,8 @@ class path:
             dfbf.close()
         pmin.datafile = self.datafile
         #return path object, float
+        print('cost set after BF search: ',pmin.costset)
+        x = input('... cont')
         return pmin, pmin.Tcost
 
     def multiHSearch(self,dfile,nsearch):
@@ -794,31 +839,37 @@ class path:
         crow = sr*N+sc  # starting point in cost matrix
         firstrow = crow # just the row #
         maxTies = 0 # keep track of highest # of tie costs
+        # for mh search we can just re-use idxpath and path until done
         self.idxpath = []  # list if index points
         self.path = [] # list of trajectories
         self.Tcost = 0.0 # total path cost
         self.mark = [True for x in range(N*N)]
+        if costtype not in ['time','energy']:
+            error('unknown cost type: '+costtype)
+        #
+        #   build the path by greedy algorithm
+        #
         while len(self.path) < N*N: # build path up one pt at a time
+            # these store all unvisited,valid  branches out of this point/node
             edge_next_tr = []   # next point by trajectory
             edge_costs = []  # cost of branch/traj to next point
-
-            # capture cost of all unmarked,valid branches out of this node
+            #
+            # look at cost of all unmarked,valid branches out of this node
+            #
             for ccol in range(N*N):  # ccol is an index
                 if self.mark[ccol]:  # only unvisited
                     # look at all unvisited branches leaving current pt
-                    ctraj = self.Cm.m[crow][ccol]
+                    br_traj = self.Cm.m[crow][ccol] #branch trajectory from this node
                     #print('\ncrow,ccol:',crow,ccol)
-                    #ctraj.aprtr('pull tr from Cm')
-                    if ctraj.valid: # don't do self transitions
+                    #br_traj.aprtr('pull tr from Cm')
+                    if br_traj.valid: # don't do self transitions
                         if costtype == 'energy':
-                            ccost = ctraj.e_cost # now pre-computed
-                        elif costtype == 'time':
-                            ccost = ctraj.t_cost
+                            br_cost = br_traj.e_cost # now pre-computed
                         else:
-                            error('unknown cost type: '+costtype)
-                        #print('  cost:',ccost)
-                        edge_next_tr.append(ctraj) # collect all branches out
-                        edge_costs.append(ccost)   # costs of these branches
+                            br_cost = br_traj.t_cost
+                        #print(' branch cost:',br_cost)
+                        edge_next_tr.append(br_traj) # collect all branches out
+                        edge_costs.append(br_cost)   # costs of these branches
 
             # now we have to choose a random branch having min cost
             if len(edge_next_tr)==0:
@@ -833,7 +884,7 @@ class path:
                     tiebreakerlist.append(t)
                     costTmpList.append(edge_costs[i]) #costs of the tied traj's
 
-            # debugging junk
+            ## debugging junk
             if False and len(tiebreakerlist)>1:
                 depth = len(self.idxpath)
                 print(depth,': tie: ',len(tiebreakerlist), tiebreakerlist)
@@ -848,7 +899,7 @@ class path:
                     x = input('?...')
                     print('\n\n')
             #####
-            #  Collect stats on the tiebrakkerlist
+            #  Collect stats on the tiebreakerlist
             #####
             L = len(tiebreakerlist)
             #error condition checks
@@ -860,44 +911,43 @@ class path:
                 L = MAXTIEHISTO-1
             self.tie_freq[L] += 1  # count how many ties with each multiplicity L
 
-
             # pick a random entry from the ties
-            newtraj = random.choice(tiebreakerlist)
-            cminidx=ij2idx(newtraj.p2.row,newtraj.p2.col) # index of next point
+            nexttraj = random.choice(tiebreakerlist)
+            nextidx = pt2idx(nexttraj.p2) #index of next point (p1 is current pt)
 
             # Some error checks here
-            if not self.mark[cminidx]:
-                error('new path point is marked already')
-            if not newtraj.valid:
+            if not self.mark[nextidx]:
+                error('new path-point is marked already')
+            if not nexttraj.valid:
                 print('crow', crow, 'ccol: ', ccol)
                 error('path: invalid new trajectory')
             if crow != firstrow:  # no trajectory has t.p2=startPoint
                 pprev = self.path[-1].p2
-                pcurr = newtraj.p1
+                pcurr = nexttraj.p1
                 if pprev != pcurr: # check for error
                     print('crow/firstrow: ', crow, firstrow)
                     print('adding traj: ', t)
+                    print(' prev.p2, curr.p1: ', pprev, pcurr)
                     error('path trajectories dont connect! '+str(crow))
 
             # OK error checks passed
-            self.mark[cminidx] = False  # do not visit this point again
-            self.path.append(newtraj)
-            # also keep the path as list of indices
-            pathptidx = ij2idx(newtraj.p1.row,newtraj.p1.col)
-            self.idxpath.append(pathptidx)
+            self.mark[nextidx] = False  # do not visit this point again
+            self.path.append(nexttraj)
+            self.idxpath.append(nextidx)
             #print('    adding traj to path: ', self.path[-1])
-            crow = cminidx
-            self.Tcost += minCost  # close enough(!)
+
+            # nextidx now become the current point
+            crow = nextidx
             self.maxTiesHSearch = maxTies # save this (multi-hsearch will max(max(ties)))
-        # don't forget the last point in the path
-        t = self.path[-1]
-        pathendptidx = ij2idx(t.p2.row,t.p2.col)
-        self.idxpath.append(pathendptidx)
+        # don't forget the last point in the idxpath
+        self.idxpath.append(pt2idx(self.path[-1].p2))
         print('2D heuristic path search completed!')
-        print('{:} Total path cost ({:}) = {:8.2f}: '.format(self.searchtype,costtype,self.Tcost))
-        print('idxpath: ', self.idxpath)
+        #print('{:} Total path cost ({:}) = {:8.2f}: '.format(self.searchtype,costtype,self.Tcost))
+        #print('idxpath: ', self.idxpath)
         #return path object, float
-        return self, self.Tcost
+        self.T_cost = self.cost()  # compute and store traj cost
+        time.sleep(0.5)
+        return self, self.T_cost
 
     def check(self):
         if len(self.path) != N*N-1:
