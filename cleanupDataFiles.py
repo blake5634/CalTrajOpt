@@ -25,7 +25,7 @@ def main(args):
     # without cmd line args:
     #   auto mode based on metadata and Research Question
     datadir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS'
-    hashs = cleanoutDatafiles([datadir])
+    hashs = cleanOutDatafiles([datadir])
     print(' Now cleaning removed files from logs:')
     purgeLogsbyHash(hashs)
 
@@ -95,7 +95,7 @@ def cleanOutDatafiles(dirs):  # based on metadata
             if x.lower() == 'y':
                 for fn in remlist:
                     # keep around a set of the hashes removed
-                    hashsRemoved.add(fn.split('_')[-4])   # fragile!!
+                    hashesRemoved.add(fn.split('_')[-4])   # fragile!!
                     print(' ... removing ',fn)
                     os.remove(fn)
             else:
@@ -117,7 +117,7 @@ def cleanOutDatafiles(dirs):  # based on metadata
             else:
                 print('removing canceled')
         print('Done removing files')
-        return list(hashsRemoved)
+        return list(hashesRemoved)
 
 def purgeFilesbyHash(hlist,dirs):
     myf = bd.finder()
