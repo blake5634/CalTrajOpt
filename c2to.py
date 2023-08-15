@@ -151,7 +151,7 @@ def plotSave(fig, dpi, imagedir, imagename):
     print('your plot is saved to: ',imagepath)
 
     ####  keep a "log book" if saved
-    dim = '6D'
+    dim = '2D'  # change if on multiOpt branch
     notes = '{:}, {:}'.format(dim,imagepath)
     now = datetime.datetime.now()
     dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
@@ -366,10 +366,9 @@ class trajectory2D:
         if not self.computed and not self.constrained:
             error('Cant compute cost_e until trajectory is computed and constrained')
         c = 0.0
-        n = len(a)
         for a1 in a:
-            c += self.dt*a1*a1/n
-        self.e_cost = c
+            c += self.dt*a1*a1
+        self.e_cost = c/len(a)
         return c
 
     def cost_t(self):
@@ -394,7 +393,6 @@ class Cm: # matrix full of trajectory2D objs
         self.randgrid = False
         if df is not None:
             df.metadata.d['Random Grid'] = False
-
 
     def set_GridRandomize(self,df=None):
         self.randgrid = True
@@ -1011,8 +1009,9 @@ class path:
 
 
     def plot(self,idx, note=''): # plot a path with trajectories
-        self.plotOnePath(self.plotSetup(note))
-        self.plotDone()
+        fig = self.plotSetup(note)
+        self.plotOnePath(fig)
+        self.plotDone(fig)
 
     def plotSetup(self,note):
         if self.datafile is not None:
@@ -1066,7 +1065,7 @@ class path:
         ax.set_xlim([-axlim,axlim])
         ax.set_ylim([-axlim,axlim])
 
-    def plotDone(self):
+    def plotDone(self,figure):
         plt.show()
         df = self.datafile
         template = f'______________{df.hashcode}.png'
@@ -1077,7 +1076,7 @@ class path:
             imgdir = df.folder+'writing/'
             imgname = nroot + df.hashcode
             my_dpi = 200
-            plotSave(plt.gcf(), my_dpi, imgdir, imgname)
+            plotSave(figure, my_dpi, imgdir, imgname)
 
         else:
             print('plot image NOT saved')
