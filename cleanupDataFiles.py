@@ -18,19 +18,25 @@ def main(args):
             ]
     if len(args) > 1: # cmd line delete specific hash files and purge from log
         hlist = args[1:]
-        purgeFilesbyHash(hlist,dirs)
-        purgeLogsbyHash(hlist)
-        quit()
-
-    # without cmd line args:
-    #   auto mode based on metadata and Research Question
-    datadir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS'
-    hashs = cleanOutDatafiles([datadir])
-    if len(hashs) > 0:
-        print('          Now cleaning removed files from logs:')
-        purgeLogsbyHash(hashs)
+        hrem = purgeFilesbyHash(hlist,dirs)
+        for h in hrem:
+            log_record_deletions(hrem,'file')
+        hrem = purgeLogsbyHash(hlist)
+        for h in hrem:
+            log_record_deletions(h,'log entry')
     else:
-        print('          No log file cleaning is needed. Logfile unmodified')
+        # without cmd line args:
+        #   auto mode based on metadata and Research Question
+        datadir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS'
+        hashs = cleanOutDatafiles([datadir])
+        if len(hashs) > 0:
+            print('          Now cleaning removed files from logs:')
+            hrem = purgeLogsbyHash(hashs)
+            for h in hrem:
+                log_record_deletions(h,'log entry')
+        else:
+            print('          No log file cleaning is needed. Logfile unmodified')
+    quit()
 
 def cleanOutDatafiles(dirs):  # based on metadata
     #####################################################################
@@ -99,7 +105,12 @@ def cleanOutDatafiles(dirs):  # based on metadata
             if x.lower() == 'y':
                 for fn in remlist:
                     # keep around a set of the hashes removed
-                    hashesRemoved.add(fn.split('_')[-4])   # fragile!!
+                    #hver1 = (fn.split('_')[-4])   # fragile!!
+                    hashesRemoved.add(fn.match(r"^[a-fA-F0-9]{8}$")[0])
+                    #if hver1 != hver2:
+                        #print('somethings wrong')
+                        #quit()
+
                     print(' ... removing ',fn)
                     os.remove(fn)
             else:
@@ -118,6 +129,7 @@ def cleanOutDatafiles(dirs):  # based on metadata
                 FILESWEREREMOVED = True
                 for fn in remlistCSV:
                     print(' ... removing ',fn)
+                    hashesRemoved.add(fn.match(r"^[a-fA-F0-9]{8}$")[0])
                     os.remove(fn)
 
             else:
@@ -129,6 +141,7 @@ def cleanOutDatafiles(dirs):  # based on metadata
         return list(hashesRemoved)
 
 def purgeFilesbyHash(hlist,dirs):
+    hashesRemoved = set()
     myf = bd.finder()
     myf.set_dirs(dirs)
     fds = []
@@ -144,12 +157,16 @@ def purgeFilesbyHash(hlist,dirs):
     if x.lower() == 'y':
         for fd in fds:
             print(' ... removing ',fd[1])
+            hashesRemoved.add(fn.match(r"^[a-fA-F0-9]{8}$")[0])
             os.remove(fd[0]+'/'+fd[1])
     else:
         print('removing canceled')
     #
+    return hashesRemoved
+
 
 def purgeLogsbyHash(hlist):
+    hashesRemoved = set()
     x = input(f'\n\n          OK to purge {hlist} from log files?? ... (y/N)')
     if x.lower() == 'y':
         # now purge entries from the logs
@@ -183,8 +200,34 @@ def purgeLogsbyHash(hlist):
                 print(l.strip(),file=f)
             f.close()
             print(f' {len(deletelines)} lines purged from {justname}.')
+            return hashesRemoved
     else:
         print(' purging logs canceled.')
+
+def log_record_deletions(hash, dtype):
+    logfile = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/deletions.txt'
+    f = open(logfile, 'a')
+    now = dt.datetime.now()
+    dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
+    logline = '{dtstring}: deleted {dtype} for {hash}'
+    print(logline,file=f)
+    f.close()
+
+def logentry(df,notes):
+    logdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
+    logfilename = 'work_logbook.txt'
+    q = df.metadata.d['Research Question']
+    if len(q)>0 and 'debug' not in q:  # skip junk files
+        now = dt.datetime.now()
+        dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
+        logline = '{:}, {:}, {:},  RQ: {:}'.format(dtstring,df.hashcode, notes, q)
+        with open(logdir+logfilename,'a') as f:
+            print(logline,file=f)
+            f.close()
+            print('added log entry to: ',logdir+'work_logbook.txt')
+    else:
+        print(f'debugging detected. {df.hashcode} will not be logged to {logdir+logfilename}')
+
 
 
 if __name__ ==  '__main__':
