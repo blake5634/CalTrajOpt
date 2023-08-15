@@ -562,7 +562,11 @@ class path:
         n_all_paths = math.factorial(N*N)
         print('Starting {:} search: N={:}'.format(self.searchtype,N))
         if sampling:
-            print('   Sampling {:} paths out of {:12.5e}'.format(nsamples,float(n_all_paths)))
+            print(f'   Sampling {nsamples} paths out of {float(n_all_paths):12.5e}')
+        else:
+            print(f'   Exhaustive search of {float(n_all_paths):12.5e} paths.')
+
+        x = input(' ... ready?  ...')
 
         LOWMEM = False
         if N>3:
@@ -602,17 +606,14 @@ class path:
             piter = itt.permutations(range(N*N),N*N) # not a list!
         else:
             print('We are generating {:} random paths through {:} nodes'.format(nsamples,N*N))
-            piter = []
             phashset = set()
-            for i in range(nsamples):
+            while len(phashset) < nsamples:
                 p = list(range(N*N))
                 random.shuffle(p) # generate a path as random list of indices
                 pthash = ''
                 for j in p:
                     pthash +='{:3d}'.format(j) # 'hash' the list
-                if pthash not in phashset: # we've found a new pt
-                    piter.append(p)
-                    phashset.add(pthash)
+                phashset.add(pthash) # robust to random duplicates
 
         print('Path enumeration complete:')
 
@@ -836,17 +837,15 @@ class path:
 
     def heuristicSearch(self,startptidx):  # path class
         # add to self.path[] one traj at a time greedily
-        #sr, sc = idx2ij(startptidx)
-        #crow = sr*N+sc  # starting point in cost matrix
+
         #crow indicates the point we are incrementally searching from
         #     possible branches from crow are the cols, ccol (if not yet added
         #     and not self transitions)
         crow = startptidx  # first crow is here
-        firstrow = crow # just the row #
+        firstrow = crow # just the row number
 
         maxTies = 0 # keep track of highest # of tie costs
-        # for mh search we can just re-use idxpath and path until done
-        self.idxpath = []  # list if index points
+        self.idxpath = [startptidx]  # list if index points
         self.path = [] # list of trajectories
         self.Tcost = 0.0 # total path cost
         self.mark = [True for x in range(N*N)]
@@ -856,10 +855,11 @@ class path:
         #
         #   build the path by greedy algorithm
         #
-        while len(self.path) < N*N: # build path up one pt at a time
+        print('   >>> New hsearch')
+        while len(self.path) < N*N-1: # build path up one pt at a time
             # these store all unvisited,valid  branches out of this point/node
-            edge_next_tr = []   # next point by trajectory
-            edge_costs = []  # cost of branch/traj to next point
+            edge_next_tr = []   # trajectory to the next pt
+            edge_costs = []  # cost of branch/traj to the next point
             #
             # look at cost of all unmarked,valid branches out of this node
             #
@@ -870,7 +870,6 @@ class path:
                     #print('\ncrow,ccol:',crow,ccol)
                     #br_traj.aprtr('pull tr from Cm')
                     if br_traj.valid: # don't do self transitions
-                        print('valid transition: ', crow, ccol)
                         if costtype == 'energy':
                             br_cost = br_traj.e_cost # now pre-computed
                         else:
@@ -920,8 +919,9 @@ class path:
             self.tie_freq[L] += 1  # count how many ties with each multiplicity L
 
             # pick a random entry from the ties
-            nexttraj = random.choice(tiebreakerlist)
+            nexttraj =  random.choice(tiebreakerlist)
             nextidx = pt2idx(nexttraj.p2) #index of next point (p1 is current pt)
+            #print(f'   ... adding {len(self.idxpath)}th pt: {nexttraj.p2} index: {pt2idx(nexttraj.p2)}')
 
             # Some error checks here
             if not self.mark[nextidx]:
