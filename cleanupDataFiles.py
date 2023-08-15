@@ -26,8 +26,11 @@ def main(args):
     #   auto mode based on metadata and Research Question
     datadir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS'
     hashs = cleanOutDatafiles([datadir])
-    print(' Now cleaning removed files from logs:')
-    purgeLogsbyHash(hashs)
+    if len(hashs) > 0:
+        print('          Now cleaning removed files from logs:')
+        purgeLogsbyHash(hashs)
+    else:
+        print('          No log file cleaning is needed. Logfile unmodified')
 
 def cleanOutDatafiles(dirs):  # based on metadata
     #####################################################################
@@ -57,6 +60,7 @@ def cleanOutDatafiles(dirs):  # based on metadata
         #
         remlist = []
         remlistCSV = []
+        FILESWEREREMOVED = False
         for fnr in filenameroots:
             mdname = fnr+'_meta.json'
             if(os.path.exists(mdname)):  # if we can find a metadata file
@@ -111,12 +115,17 @@ def cleanOutDatafiles(dirs):  # based on metadata
             x = input('\n\n          OK to delete these files?? ... (y/N)')
 
             if x.lower() == 'y':
+                FILESWEREREMOVED = True
                 for fn in remlistCSV:
                     print(' ... removing ',fn)
                     os.remove(fn)
+
             else:
                 print('removing canceled')
-        print('Done removing files')
+        if FILESWEREREMOVED:
+            print('\n          Done removing files\n')
+        else:
+            print('\n          No files were matched or removed\n')
         return list(hashesRemoved)
 
 def purgeFilesbyHash(hlist,dirs):
