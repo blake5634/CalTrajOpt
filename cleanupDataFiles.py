@@ -5,6 +5,11 @@ import os
 import c2to as cto
 import sys
 import brl_data.brl_data as bd
+import re
+import datetime as dt
+
+hashmatcher = r'[^a-f,^0-9]*([a-f, 0-9]{8})[^a-f,^0-9]*' # 8character hex hash
+hmc = re.compile(hashmatcher)
 
 def main(args):
 
@@ -20,7 +25,7 @@ def main(args):
         hlist = args[1:]
         hrem = purgeFilesbyHash(hlist,dirs)
         for h in hrem:
-            log_record_deletions(hrem,'file')
+            log_record_deletions(h,'file')
         hrem = purgeLogsbyHash(hlist)
         for h in hrem:
             log_record_deletions(h,'log entry')
@@ -105,12 +110,7 @@ def cleanOutDatafiles(dirs):  # based on metadata
             if x.lower() == 'y':
                 for fn in remlist:
                     # keep around a set of the hashes removed
-                    #hver1 = (fn.split('_')[-4])   # fragile!!
-                    hashesRemoved.add(fn.match(r"^[a-fA-F0-9]{8}$")[0])
-                    #if hver1 != hver2:
-                        #print('somethings wrong')
-                        #quit()
-
+                    hashesRemoved.add(getHashFromFilename(fn))
                     print(' ... removing ',fn)
                     os.remove(fn)
             else:
@@ -129,7 +129,7 @@ def cleanOutDatafiles(dirs):  # based on metadata
                 FILESWEREREMOVED = True
                 for fn in remlistCSV:
                     print(' ... removing ',fn)
-                    hashesRemoved.add(fn.match(r"^[a-fA-F0-9]{8}$")[0])
+                    hashesRemoved.add(getHashFromFilename(fn))
                     os.remove(fn)
 
             else:
@@ -156,13 +156,27 @@ def purgeFilesbyHash(hlist,dirs):
     x = input('\n\n          OK to delete these files?? ... (y/N)')
     if x.lower() == 'y':
         for fd in fds:
-            print(' ... removing ',fd[1])
-            hashesRemoved.add(fn.match(r"^[a-fA-F0-9]{8}$")[0])
+            fn = fd[1]
+            print(' ... removing ',fn)
+            hashesRemoved.add(getHashFromFilename(fn))
             os.remove(fd[0]+'/'+fd[1])
     else:
         print('removing canceled')
     #
     return hashesRemoved
+
+
+def getHashFromFilename(fn):
+        result = hmc.findall(fn)
+        if len(result) < 1:
+            print('getHashFromFilename result:',result)
+            print(f'No hash found in filename: {fn} (should have {hver1})')
+            quit()
+        if len(result) > 1:
+            print(f'getHashfromFilename - warning: {len(result)} hashes found only first one used')
+        hashResult = result[0]
+        #print(f'result: {result}, hv2: {hashResult}')
+        return hashResult
 
 
 def purgeLogsbyHash(hlist):
@@ -190,7 +204,9 @@ def purgeLogsbyHash(hlist):
             print(f'\n Deleting {len(deletelines)} {hlist} entries from {justname}')
             f.close()
             for l in deletelines:
-                print('deleting: ',l.strip())
+                l = l.strip()
+                print('deleting: ',l)
+                delhash = hmc.findall(l)
 
             # confirm y/N ??
 
@@ -209,7 +225,7 @@ def log_record_deletions(hash, dtype):
     f = open(logfile, 'a')
     now = dt.datetime.now()
     dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
-    logline = '{dtstring}: deleted {dtype} for {hash}'
+    logline = f'{dtstring}: deleted {dtype} for {hash}'
     print(logline,file=f)
     f.close()
 
