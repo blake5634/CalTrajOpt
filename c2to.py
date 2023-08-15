@@ -244,9 +244,9 @@ class point2D:
 
     def __eq__(self,x):
         #return self.row == x.row and self.col == x.col
-        epsilon = 0.002
-        ex = abs(self.x-x.x)/x.x < epsilon
-        ev = abs(self.v-x.v)/x.v < epsilon
+        epsilon = 0.02
+        ex = abs(self.x-x.x) < epsilon # range normalized to -1,1
+        ev = abs(self.v-x.v) < epsilon
         return ex and ev
 
     def __repr__(self):
@@ -408,15 +408,16 @@ class Cm: # matrix full of trajectory2D objs
         grid.randgrid = False # we do the setting of this and the randomization itself HERE
         if grid.fromFile:  # we have read grid already from file and it must be random
             grid.randgrid=True
-        elif self.randgrid:  # but we haven't read a file (gen from scratch)
+        elif self.randgrid:  # but if haven't read a file, (gen from scratch)
             grid.randgrid=True
             # go through the grid and randomize their x,v
             for r in range(N):  # for all 2nd points
                 for c in range(N):
-                    p1 = grid.gr[r][c]
-                    p1.randomize()
-                    grid.gr[r][c] = p1
-
+                    ptmp = grid.gr[r][c]
+                    ptmp.randomize()
+                    grid.gr[r][c] = ptmp
+        else: # no file and not random: non random grid
+            pass # grid should already have x,v coordinates
         # now get a tr (and costs) for all possible transitions (row x col)
         for i1 in range(N*N):
             for j1 in range(N*N):
@@ -426,7 +427,8 @@ class Cm: # matrix full of trajectory2D objs
                 p2 = grid.gr[r2][c2]
                 # we now have p1 and p2
                 t = trajectory2D(p1,p2)
-                if (p1.x == p2.x and p1.v == p2.v): # robust to random pts
+                t.valid = True
+                if (p1 == p2): # robust to random pts
                     nselftr += 1
                     t.valid = False  # eliminate self transitions
                 else:  # compute the two costsF
@@ -501,7 +503,6 @@ class path:
         #collect tie stats on this path
         self.maxTiesHSearch = -99999999  # most ties when greedy searching
         self.tie_freq = np.zeros(MAXTIEHISTO)  # histogram of how many ties of
-        self.costset = set()  # testing only
 
     def search(self,searchtype,dfile=None,nsamples=1000):
         self.searchtype = searchtype
@@ -514,7 +515,8 @@ class path:
         #  select the type of search to do
         #
         if searchtype.startswith('heur'):
-            p, cmin = self.heuristicSearch()
+            startidx = 1
+            p, cmin = self.heuristicSearch(startidx)
         elif searchtype.startswith('multi'):
             if dfile is None:
                 error('path.search: multi heuristic search requires a dfile')
@@ -531,10 +533,10 @@ class path:
             error('path.search: unknown search type: ', searchtype)
         #report timing
         ts2 = datetime.datetime.now()
-        dt = (ts2-ts1).total_seconds()
-        print('seconds per {:} paths: {:}'.format(nsamples, float(dt)))
-        print('seconds per path: {:}'.format(float(dt)/nsamples))
-        save_timing(dfile,searchtype,PCNAME,float(dt)/nsamples)
+        perfdt = (ts2-ts1).total_seconds()
+        print('seconds per {:} paths: {:}'.format(nsamples, float(perfdt)))
+        print('seconds per path: {:} (includes plot viewing time!)'.format(float(perfdt)/nsamples))
+        save_timing(dfile,searchtype,PCNAME,float(perfdt)/nsamples)
         p.datafile=dfile
         return p,cmin
 
@@ -648,6 +650,9 @@ class path:
                     if pprev != pcurr: # check for error
                         print(' prev.p2, curr.p1: ', pprev, pcurr)
                         error(f'path trajectories dont connect! node #: {i}')
+                # valid flag check:
+                if prvidx != ptidx and not tr.valid:
+                    print('Ive got a wierd .valid flag (should be True)')
             print('testing at iter:',itrct)
             print('p.idxpath: ', p.idxpath)
             #print('p.path: ', p.path)
@@ -707,8 +712,6 @@ class path:
             dfbf.close()
         pmin.datafile = self.datafile
         #return path object, float
-        print('cost set after BF search: ',pmin.costset)
-        x = input('... cont')
         return pmin, pmin.Tcost
 
     def multiHSearch(self,dfile,nsearch):
@@ -764,8 +767,6 @@ class path:
                     startPtIdx = random.randint(0,N*N-1)
                 else:
                     startPtIdx = i
-                print(f'TF: {MULTI_SEARCH_PER_PT} startpt: {startPtIdx} iteration: {m}')
-                self.mark[startPtIdx] = False # mark our starting point
                 self.Tcost = 0.0
                 count = 0
 
@@ -835,15 +836,21 @@ class path:
 
     def heuristicSearch(self,startptidx):  # path class
         # add to self.path[] one traj at a time greedily
-        sr, sc = idx2ij(startptidx)
-        crow = sr*N+sc  # starting point in cost matrix
+        #sr, sc = idx2ij(startptidx)
+        #crow = sr*N+sc  # starting point in cost matrix
+        #crow indicates the point we are incrementally searching from
+        #     possible branches from crow are the cols, ccol (if not yet added
+        #     and not self transitions)
+        crow = startptidx  # first crow is here
         firstrow = crow # just the row #
+
         maxTies = 0 # keep track of highest # of tie costs
         # for mh search we can just re-use idxpath and path until done
         self.idxpath = []  # list if index points
         self.path = [] # list of trajectories
         self.Tcost = 0.0 # total path cost
         self.mark = [True for x in range(N*N)]
+        self.mark[startptidx] = False  # our first pt must be marked
         if costtype not in ['time','energy']:
             error('unknown cost type: '+costtype)
         #
@@ -863,6 +870,7 @@ class path:
                     #print('\ncrow,ccol:',crow,ccol)
                     #br_traj.aprtr('pull tr from Cm')
                     if br_traj.valid: # don't do self transitions
+                        print('valid transition: ', crow, ccol)
                         if costtype == 'energy':
                             br_cost = br_traj.e_cost # now pre-computed
                         else:
