@@ -216,7 +216,7 @@ def purgeLogsbyHash(hlist):
                 print(l.strip(),file=f)
             f.close()
             print(f' {len(deletelines)} lines purged from {justname}.')
-            return hashesRemoved
+        return hashesRemoved
     else:
         print(' purging logs canceled.')
 
