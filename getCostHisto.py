@@ -15,24 +15,27 @@ def main(args):
 
     #####################################################################
     #
-    # ask user for a hint so they don't have to enter a long filename
+    # ask user for a hint (argv[1]) so they don't have to enter a long filename
     #
     datadir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS'
-    files = os.listdir(datadir)
-    csvfiles = []
-    for f in files:
-        if '.csv' in f and 'ties_info' not in f:
-            csvfiles.append(f)
+    dirlist = [datadir, '/home/blake/Ptmp/CalTrajOpt']
 
-    hashstr = input('Enter first 4 characters of the hash from the filename:')
-    if len(hashstr) < 4:
-        print(' you like to live dangerously! (might match multiple files)')
-    dfname = None
-    for f in csvfiles:
-        if hashstr in f:
-            dfname = f
-    if not dfname:
-        bd.brl_error('Somethings wrong with hash string (not found)')
+    mf = bd.finder()
+    mf.set_dirs(dirlist)
+
+    hashstr = args[1]
+    res = mf.findh([hashstr, '.csv']) # find files with hash and are .csv ext.
+    res2=[]
+    for r in res:
+        if not 'ties' in r[1]:
+            res2.append(r)
+    res = res2
+    if len(res) < 1:
+        bd.brl_error(' file not found. hash: '+hashstr)
+    if len(res) > 1:
+        bd.brl_error('   too many results: '+hashstr)
+    datadir = res[0][0]
+    dfname  = res[0][1]
 
     #
     #  OK - now lets create a datafile and open it for reading

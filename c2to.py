@@ -604,14 +604,17 @@ class path:
             piter = itt.permutations(range(N*N),N*N) # not a list!
         else:
             print('We are generating {:} random paths through {:} nodes'.format(nsamples,N*N))
-            phashset = set()
+            piter = []
+            phashset = set() # just for detection dupes
             while len(phashset) < nsamples:
                 p = list(range(N*N))
                 random.shuffle(p) # generate a path as random list of indices
                 pthash = ''
                 for j in p:
                     pthash +='{:3d}'.format(j) # 'hash' the list
-                phashset.add(pthash) # robust to random duplicates
+                if pthash not in phashset:
+                    piter.append(p) # the actual path
+                    phashset.add(pthash) # robust to random duplicates
 
         print('Path enumeration complete:')
 
@@ -952,7 +955,7 @@ class path:
         #print('idxpath: ', self.idxpath)
         #return path object, float
         self.T_cost = self.cost()  # compute and store traj cost
-        time.sleep(0.5)
+        #time.sleep(0.5)
         return self, self.T_cost
 
     def check(self):

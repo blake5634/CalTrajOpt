@@ -5,6 +5,7 @@ import c2to as cto
 import sys
 import brl_data.brl_data as bd
 import datetime as dt
+import numpy as np
 
 
 #  Usage:
@@ -82,17 +83,17 @@ def main(args):
     #
     #   Choose search type
     #
-    SEARCHT = 'heuristic search' # greedy nearest neighbor
+    ##SEARCHT = 'heuristic search' # greedy nearest neighbor (working??)
     #SEARCHT = 'exhaustive'   # enumerate all paths (formerly 'brute force') (2D only!)
-    #SEARCHT = 'sampling search' # nsearch random paths
+    SEARCHT = 'sampling search' # nsearch random paths
     #SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
     #
     #   Choose search size
     #
-    #nsearch = int(np.math.factorial(9)* 0.10)  # 10% of 3x3
-    #nsearch = 100000  # 1M
-    nsearch = 50*N*N   # 4 searches from each starting pt
-    #nsearch = 9
+    nsearch = int(np.math.factorial(9) * 0.10)  # 10% of 3x3
+    #nsearch =
+    #nsearch = 1*N*N   # 4 searches from each starting pt
+    #nsearch = 4
 
     #
     #   Choose cost type
