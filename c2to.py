@@ -948,8 +948,6 @@ class path:
             # nextidx now become the current point
             crow = nextidx
             self.maxTiesHSearch = maxTies # save this (multi-hsearch will max(max(ties)))
-        # don't forget the last point in the idxpath
-        self.idxpath.append(pt2idx(self.path[-1].p2))
         print('2D heuristic path search completed!')
         #print('{:} Total path cost ({:}) = {:8.2f}: '.format(self.searchtype,costtype,self.Tcost))
         #print('idxpath: ', self.idxpath)
