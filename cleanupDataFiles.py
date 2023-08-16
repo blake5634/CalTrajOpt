@@ -21,12 +21,19 @@ def main(args):
             '/home/blake/Sync/Research/CalTrajOpt_RESULTS/PointSetsRandom',
             '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing'
             ]
+    flags = ['nothing']
     if len(args) > 1: # cmd line delete specific hash files and purge from log
         hlist = args[1:]
-        hrem = purgeFilesbyHash(hlist,dirs)
+        #print('Test0: hlist: ',hlist)
+        if hlist[0] == '-listOnly':
+            #print(' I caught listOnly flag!')
+            flags += ['listOnly']
+            hlist = hlist[1:]  # cut first entry
+            #print('Test1: hlist: ',hlist)
+        hrem = purgeFilesbyHash(hlist,dirs,flags=flags)
         for h in hrem:
             log_record_deletions(h,'file')
-        hrem = purgeLogsbyHash(hlist)
+        hrem = purgeLogsbyHash(hlist,flags=flags)
         for h in hrem:
             log_record_deletions(h,'log entry')
     else:
@@ -140,7 +147,7 @@ def cleanOutDatafiles(dirs):  # based on metadata
             print('\n          No files were matched or removed\n')
         return list(hashesRemoved)
 
-def purgeFilesbyHash(hlist,dirs):
+def purgeFilesbyHash(hlist,dirs,flags=['None']):
     hashesRemoved = set()
     myf = bd.finder()
     myf.set_dirs(dirs)
@@ -153,6 +160,8 @@ def purgeFilesbyHash(hlist,dirs):
     for fd in fds:
         i+=1
         print(f'    {i}: [{fd[0]}/{fd[1]}]')
+    if 'listOnly' in flags:
+        return []
     x = input('\n\n          OK to delete these files?? ... (y/N)')
     if x.lower() == 'y':
         for fd in fds:
@@ -160,10 +169,10 @@ def purgeFilesbyHash(hlist,dirs):
             print(' ... removing ',fn)
             hashesRemoved.add(getHashFromFilename(fn))
             os.remove(fd[0]+'/'+fd[1])
+        return list(hashesRemoved)
     else:
         print('removing canceled')
-    #
-    return hashesRemoved
+        return []
 
 
 def getHashFromFilename(fn):
@@ -179,46 +188,56 @@ def getHashFromFilename(fn):
         return hashResult
 
 
-def purgeLogsbyHash(hlist):
-    hashesRemoved = set()
-    x = input(f'\n\n          OK to purge {hlist} from log files?? ... (y/N)')
-    if x.lower() == 'y':
-        # now purge entries from the logs
-        wlog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/work_logbook.txt'
-        ilog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/image_log.txt'
-        logs = [wlog, ilog]
-        for lf in logs:
-            justname = lf.split('/')[-1]
-            f = open(lf,'r')
-            keeplines = []
-            deletelines = []
-            for line in f:
-                save = True
-                for h in hlist:
-                    if h in line:
-                        save = False
-                if save:
-                    keeplines.append(line)
-                else:
-                    deletelines.append(line)
-            print(f'\n Deleting {len(deletelines)} {hlist} entries from {justname}')
-            f.close()
-            for l in deletelines:
-                l = l.strip()
-                print('deleting: ',l)
-                delhash = hmc.findall(l)
+def purgeLogsbyHash(hlist,flags=['None']):
+    print(f'\nChecking  {hlist} in log files.')
+    # now purge entries from the logs
+    wlog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/work_logbook.txt'
+    ilog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/image_log.txt'
+    logs = [wlog, ilog]
+    for lf in logs:
+        justname = lf.split('/')[-1]
+        f = open(lf,'r')
+        keeplines = []
+        deletelines = []
+        for line in f:
+            save = True
+            for h in hlist:
+                if h in line:
+                    save = False
+            if save:
+                keeplines.append(line)
+            else:
+                deletelines.append(line)
+        if 'listOnly' in flags:
+            pass
+            #print(f'\n    Matched {len(deletelines)} {hlist} entries from {justname}')
+        else:
+            print(f'\n    Deleting {len(deletelines)} {hlist} entries from {justname}')
+        f.close()
 
-            # confirm y/N ??
+        # explain what you will do
+        print(f'{justname}:')
+        i=0
+        for l in deletelines:
+            i+=1
+            l = l.strip()
+            print(f'    {i}: [{l}]')
 
-            # now do it
-            f = open(lf,'w')
-            for l in keeplines:
-                print(l.strip(),file=f)
-            f.close()
-            print(f' {len(deletelines)} lines purged from {justname}.')
-        return hashesRemoved
-    else:
-        print(' purging logs canceled.')
+        # confirm y/N ??
+        if 'listOnly' not in flags:
+            x = input(f'\n\n   OK to delete {len(deletelines)} from {justname}?')
+            if x.lower == 'y':
+                # now modify the file
+                f = open(lf,'w')
+                for l in keeplines:
+                    print(l.strip(),file=f)
+                f.close()
+                print(f' {len(deletelines)} lines purged from {justname}.')
+            else:
+                print(' purging logs canceled.')
+    if 'listOnly' in flags:
+        print('\n\n             List only, no actions were taken.')
+    return [] # we don't log hashes deleted from log files
 
 def log_record_deletions(hash, dtype):
     logfile = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/deletions.txt'
