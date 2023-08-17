@@ -132,7 +132,7 @@ def cleanOutDatafiles(dirs):  # based on metadata
                 FILESWEREREMOVED = True
                 for fn in remlistCSV:
                     print(' ... removing ',fn)
-                    hashesRemoved.add(getHashFromFilename(fn))
+                    hashesRemoved.add(bd.getHashFromFilename(fn))
                     os.remove(fn)
 
             else:
@@ -163,7 +163,7 @@ def purgeFilesbyHash(hlist,dirs,flags=['None']):
         for fd in fds:
             fn = fd[1]
             print(' ... removing ',fn)
-            hashesRemoved.add(getHashFromFilename(fn))
+            hashesRemoved.add(bd.getHashFromFilename(fn))
             os.remove(fd[0]+'/'+fd[1])
         return list(hashesRemoved)
     else:
