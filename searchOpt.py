@@ -61,7 +61,9 @@ def main(args):
         # find points file by its hash
         myf = bd.finder()
         myf.set_dirs([DataFolder+PointsFolder])
+        print(f' search random looking in {DataFolder+PointsFolder}')
         keys = [pointsHash, '.csv']            # look for requested rand points file
+        print(f'               looking for {pointsHash}')
         fns = myf.findh(keys)
         pointsDataFolder = fns[0][0]  # should be same as .set_dirs above
         pointsDataName   = fns[0][1]
@@ -76,7 +78,7 @@ def main(args):
 
     #  gridtype is set by command line args (see above)
 
-    cto.N = 4
+    cto.N = 3
     cto.M = cto.N*cto.N
     N = cto.N
 
@@ -85,15 +87,15 @@ def main(args):
     #
     ##SEARCHT = 'heuristic search' # greedy nearest neighbor (working??)
     #SEARCHT = 'exhaustive'   # enumerate all paths (formerly 'brute force') (2D only!)
-    SEARCHT = 'sampling search' # nsearch random paths
-    #SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
+    #SEARCHT = 'sampling search' # nsearch random paths
+    SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
     #
     #   Choose search size
     #
     #nsearch = int(np.math.factorial(N*N) * 0.10)  # 10% of 3x3
-    nsearch = 1000000  # 1M
+    #nsearch = 1000000  # 1M
     #nsearch =
-    #nsearch = 1*N*N   # 4 searches from each starting pt
+    nsearch = 4*N*N   # 4 searches from each starting pt
     #nsearch = 4
 
     #
