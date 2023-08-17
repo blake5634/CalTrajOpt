@@ -107,7 +107,7 @@ def getcoord(idx):
         r = (r-v[5-i])//N
     return v
 
-def setupPoints():
+def setupPoints6D():
     global pts, Cm
     Cm = Cm() # initially all zeros
     pts = []
@@ -122,6 +122,8 @@ def setupPoints():
             newpt = point3D(getcoord(i))
             print('.',end='')
             pts.append(newpt)
+    print('')
+    print(f'setupPoints6D generated {len(pts)} points')
     return pts
 
 def predict_timing(df, searchtype, systemName, nsamp):
@@ -569,17 +571,19 @@ class search_from_curr_pt:
                     self.found = True
 
     def eval_cost(self,i1,i2):
-        try:
-            #tc,ec = self.path.Cm.m[i1][i2]
-            p1 = pts[i1]
-            p2 = pts[i2]
-            tr = trajectory3D(p1,p2)
-            tc,te = tr.getCosts()
-        except Exception as ex:
-            print(type(ex).__name__, ex.args)
-            print('bad path indeces? ',i1,i2)
-            #print('Cm[][]:',self.path.Cm.m[i1][i2])
-            quit()
+        #try:
+        #tc,ec = self.path.Cm.m[i1][i2]
+        p1 = pts[i1]
+        p2 = pts[i2]
+        tr = trajectory3D(p1,p2)
+        tc,te = tr.getCosts()
+        #except Exception as ex:
+            #print('Exception in eval_cost:', type(ex).__name__, ex.args)
+            #print('bad path indeces? ',i1,i2)
+            #print(f'len pts: {len(pts)}')
+            #print(f'examples: 0:{pts[0]}, 9:{pts[9]}')
+            ##print('Cm[][]:',self.path.Cm.m[i1][i2])
+            #quit()
         if self.costtype == 'energy':
             retCost = te
         elif self.costtype == 'time':
@@ -875,6 +879,7 @@ class path3D:
             startPtIdx = i
             for m in range(nperstart): # do each start pt this many times
                 # reset search info
+                print(f'Prog: {i}/{N**6}')
                 print('        iteration  ',m,'/',nperstart,'  for starting point',i)
                 self.mark = [True for x in range(N**6)]
                 count = 0

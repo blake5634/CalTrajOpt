@@ -9,24 +9,28 @@ import brl_data.brl_data as bd
 import datetime as dt
 import numpy as np
 
-
+usageString = '''
 #  Usage:
 #
-# 1) Generate points data file (for random grid re-use)
+# 1) Generate points data file (for random grid re-use):
 #
 #    >p3 searchOpt.py generate
 #
-# 2) Search a stored random grid
+# 2) Search a stored random grid:
 #
 #    >p3 searchOpt.py hhhhhh  (hash code of grid points file)
 #
-# 3) Search a rectangular grid
+# 3) Search a rectangular grid:
 #
-#    >p3 searchOpt.py
+#    >p3 searchOpt.py rect
 #
+'''
 
 def main(args):
-    cto.configure()
+    if len(args) < 2 or len(args)>3:
+        print(usageString)
+        cto.error(' bad command line ')
+    cto.configure()  # can be overridden below
     ###################################################
     #    Process command line
     #
@@ -37,18 +41,18 @@ def main(args):
         gridtype = 'random'   # 2 arg version always 'random'
         if args[1].startswith('gen'):
             OP_MODE = 'generate'
+        elif args[1].startswith('rec'):
+            OP_MODE = 'search'
+            gridtype = 'rectangular'  # 1 arg version never random grid
         else: # we got a hashcode
             OP_MODE = 'search'
             pointsHash = args[1]
             print(f'Reading random points from {pointsHash}')
-    if len(args) == 1:   # >p3 searchOpt.py  (search rect grid)
-        OP_MODE = 'search'
-        gridtype = 'rectangular'  # 1 arg version never random grid
-
-    ###################################################  checks
+    cto.gridType = gridtype
+    ###################################################
+    # some sanity checks
     if OP_MODE not in ['generate', 'search']:
         cto.error('searchOpt.py: illegal POINTS MODE')
-
     if OP_MODE == 'generate' and gridtype != 'random':
         cto.error('SearchOpt: Cannot generate points file unless grid is random')
     ###################################################
@@ -71,19 +75,30 @@ def main(args):
         pointsDataName   = fns[0][1]
         pointsFilename = pointsDataFolder + '/'+pointsDataName  # full path of points file
 
+
+
+
+
+
     ##########################################################################
     #
     #    Configure the job
     #
-    SPACE = '2D'
-    #SPACE = '6D'
+
+    #SPACE = '2D'
+    SPACE = '6D'
+    if SPACE not in ['2D', '6D']:
+        cto.error(' must select space from 2D or 6D')
 
     #  gridtype is set by command line args (see above)
-
+    # Grid points:
     cto.N = 3
-    cto.M = cto.N*cto.N
     N = cto.N
-
+    if SPACE == '2D':
+        Npts = N*N
+    else:
+        Npts = N**6
+    cto.M = Npts
     #
     #   Choose search type
     #
@@ -91,38 +106,69 @@ def main(args):
     #SEARCHT = 'exhaustive'   # enumerate all paths (formerly 'brute force') (2D only!)
     #SEARCHT = 'sampling search' # nsearch random paths
     SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
+
+    searchType = SEARCHT
+
     #
     #   Choose search size
     #
-    #nsearch = int(np.math.factorial(N*N) * 0.10)  # 10% of 3x3
+    #nsearch = int(np.math.factorial(Npts) * 0.10)  # 10% of 3x3
     #nsearch = 1000000  # 1M
     #nsearch =
-    nsearch = 4*N*N   # 4 searches from each starting pt
+    nsearch = 4*Npts   # 4 searches from each starting pt
     #nsearch = 4
 
     #
     #   Choose cost type
     #
-    #cto.costtype = 'time'
-    cto.costtype = 'energy'
+    cto.costtype = 'time'
+    #cto.costtype = 'energy'
     cto.NPC = 30   #  # of simulation points in 0-dt time interval
     #
     ##########################################################################
 
+
     if SPACE=='6D' and SEARCHT == 'exhaustive':
         cto.error(' Not possible to do exhaustive search with 6D (dude, get a quantum computer!)')
-    ###########################################################
+    ################################################
     #
     #    Now get to work...   #
     #
-
-
-
-    ##########################################################
-    #(these will override the config file)
     #
-    #   2D version
     #
+    #    6D version
+    #
+    if SPACE == '6D':
+
+        # create the datafile:
+        df = bd.datafile('6Dsearching','BH','simulation')
+        if gridtype == 'random':
+            df.metadata.d['Random Grid'] = True
+        else:
+            df.metadata.d['Random Grid'] = False
+        df.set_folders('/home/blake/Sync/Research/CalTrajOpt_RESULTS','')
+        q = input('Research Question for this search: ')
+        df.metadata.d['Research Question'] = q
+
+        cto.pts = cto.setupPoints6D()   # just store points instead of cost matrix Cm
+        #c1 = cto.Cm(df = df)  # cost matrix
+        #c1.fill()
+
+        # compute a path:
+        #p = cto.path3d(gt,c1)
+        p = cto.path3D()
+
+        p.search(searchType,dfile=df,nsamples=nsearch,profiler=None)
+        # search will close the datafile
+
+        q = df.metadata.d['Research Question']
+        notes = '{:}, grid: {:}, n={:}, {:}, cost: {:4.2f} ({:})'.format(searchType, cto.gridType, nsearch, SPACE, df.metadata.d['Min Cost'], cto.costtype)
+        logentry(df,notes)
+        ####
+
+        print('Completed: see results at ',df.hashcode)
+
+
     if SPACE == '2D':
         #
         # create grid
@@ -184,53 +230,6 @@ def main(args):
             logentry(dfw,notes)
             # graph the optimal search result (best path)
             path2.plot(-1,notes)
-
-    #
-    #    6D version
-    #
-    if SPACE == '6D':
-        # create the datafile:
-        df = bd.datafile('6Dsearching','BH','simulation')
-        df.set_folders('/home/blake/Sync/Research/CalTrajOpt_RESULTS','')
-
-        df.metadata.d['Research Question'] = q
-
-
-
-
-    # memory profiling
-    ## memory profiling
-    #mem_snap('populate Cm')
-
-        # read in some params from config file
-        cto.configure()
-        idx = int(args[1])
-
-        pts = cto.setupPoints()   # just store points instead of cost matrix Cm
-        #c1 = cto.Cm(df = df)  # cost matrix
-
-        if RANDOMGRID:
-            df.metadata.d['Random Grid'] = True
-            cto.gridType = 'random'
-        else:
-            df.metadata.d['Random Grid'] = False
-            cto.gridType = 'rectangular'
-
-        #
-        # compute a path:
-        #p = cto.path3d(gt,c1)
-        p = cto.path3D()
-
-        p.search(searchType,dfile=df,nsamples=nsamp,profiler=mem_snap)
-        # search will close the datafile
-
-        q = df.metadata.d['Research Question']
-        notes = '{:}, grid: {:}, n={:}, {:}, cost: {:4.2f} ({:})'.format(searchType, cto.gridType, nsamp,dim, df.metadata.d['Min Cost'], cto.costtype)
-        logentry(df,notes)
-        ####
-
-        print('Completed: see results at ',df.hashcode)
-
 
 def logentry(df,notes):
     logdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
