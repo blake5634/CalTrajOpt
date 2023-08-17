@@ -57,7 +57,7 @@ def main(args):
     #
     #  OK - now lets create a datafile and open it for reading
     #
-    mds = [{},{}]
+    metadatas = [{},{}]
     hs = ['x','x']
     for ip, dfname in enumerate([dfname1, dfname2]):
         print('opening ', dfname)
@@ -67,7 +67,7 @@ def main(args):
         df.set_folders(datadir,'')        # set these to wherever you want to open datafiles
         df.open('r',tname=datadir+'/'+dfname)
         df.metadata.polish()  # convert metadata from strings to useful types
-        mds[ip] = df.metadata.d
+        metadatas[ip] = df.metadata.d
 
     xs = [0,0]
     ys = [0,0]
@@ -75,15 +75,18 @@ def main(args):
     sds = [0,0]
     for ip, dfname in enumerate([dfname1, dfname2]):
         try:
-            x =mds[ip]['CostHistogram_levels'][1:]
+            x =metadatas[ip]['CostHistogram_levels'][1:]
         except:
             cto.error('Please run getCostHisto in this data first')
         xs[ip] = x
-        ys[ip] = mds[ip]['CostHistogram_values']
-        mus[ip] = mds[ip]['CostMean']
-        sds[ip] = mds[ip]['CostStDev']
+        ys[ip] = metadatas[ip]['CostHistogram_values']
+        mus[ip] = metadatas[ip]['CostMean']
+        sds[ip] = metadatas[ip]['CostStDev']
 
-    costtype = mds[0]['CostType']
+    ct1 = metadatas[0]['CostType']
+    ct2 = metadatas[1]['CostType']
+    if ct1 != ct2:
+        cto.error(f'Two different cost types: "apples to oranges"! ({ct1}, {ct2})')
     barwidth = 0.75*(max(x)-min(x))/len(x)
     colors = ['b','r']
 
@@ -109,11 +112,11 @@ def main(args):
             #c2[i] *= scale
         plt.plot(xs[ip],curve)
     #round up maxx by 1000
-    maxx = (maxx//1000 + 1)*1000
-    #maxx = 11000
+    maxx = (maxx//100 + 1)*100
+    maxx = 100
     # plot relative to 0 for visual comparison
     plt.xlim([0,maxx])
-    plt.title('{:} cost distributions'.format(costtype))
+    plt.title('{:} cost distributions'.format(ct1))
     plt.xlabel('Cost      ({:},{:})'.format(hs[0],hs[1]))
     plt.ylabel('# paths')
     plt.tight_layout() # make sure stuff shows with custom dimensions

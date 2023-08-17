@@ -76,7 +76,7 @@ def main(args):
 
     #  gridtype is set by command line args (see above)
 
-    cto.N = 3
+    cto.N = 4
     cto.M = cto.N*cto.N
     N = cto.N
 
@@ -90,7 +90,8 @@ def main(args):
     #
     #   Choose search size
     #
-    nsearch = int(np.math.factorial(9) * 0.10)  # 10% of 3x3
+    #nsearch = int(np.math.factorial(N*N) * 0.10)  # 10% of 3x3
+    nsearch = 1000000  # 1M
     #nsearch =
     #nsearch = 1*N*N   # 4 searches from each starting pt
     #nsearch = 4
@@ -98,8 +99,8 @@ def main(args):
     #
     #   Choose cost type
     #
-    cto.costtype = 'time'
-    #cto.costtype = 'energy'
+    #cto.costtype = 'time'
+    cto.costtype = 'energy'
     cto.NPC = 30   #  # of simulation points in 0-dt time interval
     #
     ##########################################################################
@@ -152,11 +153,14 @@ def main(args):
                 dfw.metadata.d['Points Data Source'] = pointsHash
             else:
                 dfw.metadata.d['Points Data Source'] = 'Regular Grid'
-            q = input('Research Question for this search:')
+            q = input('Research Question for this search: ')
             dfw.metadata.d['Research Question'] = q
+            print(f"RQ0: {dfw.metadata.d['Research Question']}")
             # instantiate a path:
             p = cto.path(gt,c1)
             path2, cmin = p.search(SEARCHT, dfile=dfw, nsamples=nsearch)
+            print(f"RQ1: {dfw.metadata.d['Research Question']}")
+
             print('Optimal path returned: (tra)', path2.path)
             print('Optimal path returned: (idx)', path2.idxpath)
             # is it a valid path?
@@ -167,6 +171,7 @@ def main(args):
             else:
                 notes = f"Search Result: {gridtype} grid, {SEARCHT}, cost: {cmin:.1f} ({cto.costtype})"
                 print(f'\n\n               your search results file hash is: {dfw.hashcode}.')
+            print(f"RQ2: {dfw.metadata.d['Research Question']}")
             #  keep a "log book"
             logentry(dfw,notes)
             # graph the optimal search result (best path)
@@ -234,6 +239,7 @@ def logentry(df,notes):
             f.close()
             print('added log entry to: ',logdir+'work_logbook.txt')
     else:
+        print(f'RQ: {q}')
         print(f'debugging detected. {df.hashcode} will not be logged to {logdir+logfilename}')
 
 if __name__ ==  '__main__':
