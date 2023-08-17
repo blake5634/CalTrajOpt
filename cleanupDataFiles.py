@@ -225,8 +225,8 @@ def purgeLogsbyHash(hlist,flags=['None']):
 
         # confirm y/N ??
         if 'listOnly' not in flags:
-            x = input(f'\n\n   OK to delete {len(deletelines)} from {justname}?')
-            if x.lower == 'y':
+            x = input(f'\n   OK to delete {len(deletelines)} entries from {justname}? (y/N): ')
+            if x.lower() == 'y':
                 # now modify the file
                 f = open(lf,'w')
                 for l in keeplines:
