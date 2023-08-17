@@ -5,11 +5,7 @@ import os
 import c2to as cto
 import sys
 import brl_data.brl_data as bd
-import re
 import datetime as dt
-
-hashmatcher = r'[^a-f,^0-9]*([a-f, 0-9]{8})[^a-f,^0-9]*' # 8character hex hash
-hmc = re.compile(hashmatcher)
 
 def main(args):
 
@@ -117,7 +113,7 @@ def cleanOutDatafiles(dirs):  # based on metadata
             if x.lower() == 'y':
                 for fn in remlist:
                     # keep around a set of the hashes removed
-                    hashesRemoved.add(getHashFromFilename(fn))
+                    hashesRemoved.add(bd.getHashFromFilename(fn))
                     print(' ... removing ',fn)
                     os.remove(fn)
             else:
@@ -173,19 +169,6 @@ def purgeFilesbyHash(hlist,dirs,flags=['None']):
     else:
         print('removing canceled')
         return []
-
-
-def getHashFromFilename(fn):
-        result = hmc.findall(fn)
-        if len(result) < 1:
-            print('getHashFromFilename result:',result)
-            print(f'No hash found in filename: {fn} (should have {hver1})')
-            quit()
-        if len(result) > 1:
-            print(f'getHashfromFilename - warning: {len(result)} hashes found only first one used')
-        hashResult = result[0]
-        #print(f'result: {result}, hv2: {hashResult}')
-        return hashResult
 
 
 def purgeLogsbyHash(hlist,flags=['None']):

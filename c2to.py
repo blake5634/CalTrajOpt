@@ -162,7 +162,6 @@ def plotSave(fig, dpi, imagedir, imagename):
     f.close()
     ####
 
-
 class grid2D:
     def __init__(self, N):
         self.N = N
