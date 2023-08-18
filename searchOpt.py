@@ -116,13 +116,13 @@ def main(args):
     #nsearch = 1000000  # 1M
     #nsearch =
     nsearch = 4*Npts   # 4 searches from each starting pt
-    #nsearch = 4
+    #nsearch = 50
 
     #
     #   Choose cost type
     #
-    cto.costtype = 'time'
-    #cto.costtype = 'energy'
+    #cto.costtype = 'time'
+    cto.costtype = 'energy'
     cto.NPC = 30   #  # of simulation points in 0-dt time interval
     #
     ##########################################################################

@@ -25,20 +25,19 @@ def error(msg):
     quit()
 
 PCNAME = str(socket.gethostname())
-N = 4
-Npts = N**6
-M = Npts
 
+# all the following will be overridden by searchOpt.py
+
+N = 4
+Npts = N**6  # will be overridden by searchOpt SPACE flag
+M = Npts
 AMAX = 2  #  normalize for now.
 DT_TEST = 2.0
 DT_START = 1.5  # this needs to be 'smaller' so that Amax can be searched by
                 # lengthening dt, but if too small constrain_A can be too slow.
-
 NPC = 20  # number plot points per curve
-
 costtype = 'time'
 costtype = 'energy'
-
 # for 1D optimization case
 startrow = 3
 startcol = 1
@@ -76,7 +75,7 @@ def configure(fp=None):
             DT_TEST = dt_test  # fixed dt value used for testing
         if parname == 'N':
             N = int(v)
-            M = N**6  # number of grid points
+            M = Npts  # number of grid points
         if parname == 'NPC':  #n time pts in trajectory
             NPC = int(v)
         if parname == 'startrow':
@@ -112,13 +111,13 @@ def setupPoints6D():
     Cm = Cm() # initially all zeros
     pts = []
     if gridType == 'random':
-        for i in range(N**6):
+        for i in range(Npts):
             newpt = point3D(getcoord(i))
             newpt.randomize()
             print('r',end='')
             pts.append(newpt)
     else:
-        for i in range(N**6):
+        for i in range(Npts):
             newpt = point3D(getcoord(i))
             print('.',end='')
             pts.append(newpt)
@@ -208,7 +207,6 @@ def plotSave(fig, dpi, imagedir, imagename):
     ####
 
 class point3D:
-
     def __init__(self,iv):
         if len(iv) != 6:
             error('point3D: invalid index vector')
@@ -438,7 +436,7 @@ class trajectory3D:
 
 def cost_idxp(typestr, idxpath):   # compute total cost from a list of indeces
     L = len(idxpath)-1
-    if L != N**6-1:
+    if L != Npts-1:
         error('not a correct length path!: '+str(L))
     Tc = 0.0
     for i in range(L):
@@ -541,7 +539,7 @@ class search_from_curr_pt:
         self.minidx = 0
         self.minTrs = []
         self.minidxs = []
-        self.found = False
+        self.cminFound = False
         self.ties = None   # number of ties found in this set of branches
         self.mark = Mark  # array to mark already chosen pts (True == still available)
         self.path = path
@@ -559,16 +557,16 @@ class search_from_curr_pt:
 
     def find_cmin(self,index,ivect):  # should be called by iterate as first step.
         if self.mark[index]: # index = Cm.m column
-            if self.pstartIdx is None:
-                error('find_cmin: start point unknown')
             p1idx = self.pstartIdx
             p2idx = index
             if p1idx != p2idx:
                 tc = self.eval_cost(p1idx,p2idx)
+                #print('         find_cmin: ', tc, self.cmin)
+                ##x = input('  ... pause (CR) ...')
                 if tc < self.cmin:
                     self.cmin   = tc
                     self.minidx = index
-                    self.found = True
+                    self.cminFound = True
 
     def eval_cost(self,i1,i2):
         #try:
@@ -615,7 +613,7 @@ class search_from_curr_pt:
         return ti,tr #chosen next traj index, chosen next traj trajectory
 
     def find_all_cminTrs(self,index,v): # find a list of all next pts for which cost ~= cmin
-        if not self.found:
+        if not self.cminFound:
             error('search.find_all_cminTrs: somethings wrong, need to find_cmin before find_all')
         epsilon = self.cmin * 0.02 # define 'close'
         if self.mark[index]:
@@ -638,12 +636,12 @@ class path3D:
         #sizer('path3D.Cm: ',self.Cm)
         self.sr = startrow
         self.sc = startcol
-        self.mark = [True for x in range(N**6)]  # true if pt is UNvisited
+        self.mark = [True for x in range(Npts)]  # true if pt is UNvisited
         sizer('path3D.mark: ',self.mark)
         self.mark[self.sr*N+self.sc] = False # mark our starting point (can be overridden)
         self.Tcost = 0.0
         self.path = []  # the path as a list of trajectories
-        self.idxpath = [] # the path as a list of indices (0..N**6)
+        self.idxpath = [] # the path as a list of indices (0..Npts)
         self.searchtype = 'none yet'
         self.datafile = None
         self.maxTiesHSearch = -99999999  # most ties when greedy searching
@@ -708,7 +706,7 @@ class path3D:
         if not sampling:
             error('theres NO way I can do full brute force in 6D!!!')
 
-        #n_all_paths = math.factorial(N**6)
+        #n_all_paths = math.factorial(Npts)
         print('Starting {:} search: N={:}'.format(self.searchtype,N))
         if sampling:
             print('   Sampling {:} paths out of <humongous #>'.format(nsamples))
@@ -728,10 +726,10 @@ class path3D:
             print('Saving permutations (paths) to: ',df.name)
             itype = str(type(5))
             ftype = str(type(3.1415))
-            tps = [itype]*(N**6-1)      # path point seq
+            tps = [itype]*(Npts)      # path point seq
             tps.append(ftype) # the path cost's type
             names = []
-            for i in range(N**6):
+            for i in range(Npts):
                 names.append('{:}'.format(i))
             names.append('Cost')
             df.metadata.d['Ncols'] = len(names)
@@ -751,14 +749,14 @@ class path3D:
         if not sampling:
             error(' we already checked this !!!')
 
-        print('We are generating {:} random paths through {:} nodes'.format(nsamples,N**6))
+        print('We are generating {:} random paths through {:} nodes'.format(nsamples,Npts))
         phset = set()
         piter = []
         n = 0
         while n < nsamples: # make sure list has no dupes
             if n%10000 == 0:
                 print(n,' paths')
-            p = list(range(N**6))
+            p = list(range(Npts))
             random.shuffle(p) # generate a path as random list of indices
             ph = ''
             for i in range(50):
@@ -786,13 +784,16 @@ class path3D:
         pmin = path3D()
         sizer('pmax2: ',pmax)
         sizer('pmin: ',pmin)
+        updaterate = nsamples//20
         for p in piter:  # piter iterates to a series of lists of point indices
+            n+=1
             # p is the current path [idx0,idx1,idx2 ...]
             # now get the cost of p
             idxpath = list(p)
             c = cost_idxp(costtype, idxpath)  #what is cost of this path?
-            if n%2000 == 0:
-                    print('path ',n) # I'm alive!
+            if n%updaterate == 0:
+                pct = int(100.0*n/nsamples)
+                print(f'{pct:.1}%') # I'm alive!
             if STOREDATA:
                 row = idxpath # list of int index pts
                 row.append(c)
@@ -818,7 +819,7 @@ class path3D:
         #
         #  we are done with the path set to be evaluated
         #
-        print('{:} paths have been evaluated'.format(n))
+        print(f'{n} paths have been evaluated')
         print('Lowest cost path: ', pmin)
         print('path cost: ', cmin)
         print('Highest cost path: ', pmax)
@@ -839,12 +840,12 @@ class path3D:
         df = dfile
         print('Saving permutations (paths) to: ',df.name)
         names = []
-        for i in range(N**6):
+        for i in range(Npts):
             names.append('{:}'.format(i))
         names.append('Cost')
         itype = str(type(5))
         ftype = str(type(3.1415))
-        tps = [itype]*(N**6)      # path point-index sequence
+        tps = [itype]*(Npts)      # path point-index sequence
         tps.append(ftype) # the path cost's type (float)
         df.metadata.d['Types'] = tps
         df.metadata.d['Names'] = names
@@ -863,14 +864,14 @@ class path3D:
         cmin = 99999999999
         cmax = 0
         maxTies = 0
-        if nsearch > N**6:  # for big enough searches, allocate same # to all start points
-            nperstart = nsearch//N**6
-            USESTPT = True
+        if nsearch > 2*Npts:  # for big enough searches, allocate same # to all start points
+            nperstart = nsearch//Npts
+            LOOPbySTARTpt = True
         else:
-            nperstart = nsearch   # if less, just pick random start points
-            USESTPT = False
-        for i in range(N**6): # go through the start pts
-            if USESTPT:
+            nperstart = 1   # if less, just pick random start points
+            LOOPbySTARTpt = False
+        for i in range(Npts): # go through the start pts
+            if LOOPbySTARTpt:
                 if i%20==0:
                     print('multiple heuristic searches: ',i)  #I'm alive
             else:
@@ -879,13 +880,13 @@ class path3D:
             startPtIdx = i
             for m in range(nperstart): # do each start pt this many times
                 # reset search info
-                print(f'Prog: {i}/{N**6}')
+                print(f'Progress: {i}/{Npts}')
                 print('        iteration  ',m,'/',nperstart,'  for starting point',i)
-                self.mark = [True for x in range(N**6)]
+                self.mark = [True for x in range(Npts)]
                 count = 0
-                if not USESTPT:
+                if not LOOPbySTARTpt:
                     # a random start point
-                    startPtIdx = random.randint(0,N**6-1)
+                    startPtIdx = random.randint(0,Npts-1)
 
                 # don't think we need these acth
                 self.mark[startPtIdx] = False # mark our starting point
@@ -893,7 +894,7 @@ class path3D:
 
                 # do the search
                 pself,c = self.heuristicSearch3D(startPtIdx) #including random tie breakers
-                if maxTies < pself.ties:
+                if  pself.ties > maxTies:
                     maxTies = pself.ties
                 #
                 datarow = pself.idxpath  # ********
@@ -911,8 +912,6 @@ class path3D:
                     pmax = path3D()
                     pmax.path = self.path
                     pmax.Tcost = c
-            if not USESTPT:
-                break
         df.metadata.d['Min Cost']=cmin
         df.metadata.d['Max Cost']=cmax
         df.metadata.d['Max Ties']=self.maxTiesHSearch
@@ -961,11 +960,11 @@ class path3D:
         BASIC = not ADVANCED  # we're just not going to do BASIC anymore
 
         # sanity check!!
-        if N**6 > 1.0E4:
-            error('too big a search!!: '+float(N**6))
+        if Npts > 1.0E4:
+            error('too big a search!!: '+float(Npts))
 
         startPtIdx = idx1  # starting point (<N!)
-        self.mark = [True for x in range(N**6)]
+        self.mark = [True for x in range(Npts)]
         count = 0
         self.mark[idx1] = False # mark our starting point
 
@@ -976,25 +975,25 @@ class path3D:
             self.idxpath = [startPtIdx] # path has a start point
             self.nmin_max = 0
             latestIdx = startPtIdx
-            while len(self.path) < N**6 - 1:
+            while len(self.path) <= Npts:
                 li = len(self.path)
                 if li%20==0:
                     print('path pt: ',li)
-                search = search_from_curr_pt(self.mark,self)
-                search.pstartIdx = latestIdx
-                search.minTrs=[] #these will get all branches matching cmin cost.
-                search.minidxs=[]
-                search.iterate(N,search.find_cmin)
-                #print('               found cmin')
-                search.iterate(N,search.find_all_cminTrs)
-                #print('               found all ties')
-                if search.ties > self.maxTiesHSearch:  # keep track of greatest number of ties along this path
-                    self.maxTiesHSearch = search.ties
-                nxtidx,nxtTr = search.select_next()   # break a possible tie btwn branches leaving this pt.
+                srchFrmHere = search_from_curr_pt(self.mark,self)
+                srchFrmHere.cmin = 99999999 # just being sure/clear
+                srchFrmHere.pstartIdx = latestIdx
+                srchFrmHere.minTrs=[] #these will hold all branches matching cmin cost.
+                srchFrmHere.minidxs=[]
+                # iteration through the open branches from this node
+                srchFrmHere.iterate(N,srchFrmHere.find_cmin)
+                srchFrmHere.iterate(N,srchFrmHere.find_all_cminTrs)
+
+                if srchFrmHere.ties > self.maxTiesHSearch:  # keep track of greatest number of ties along this path
+                    self.maxTiesHSearch = srchFrmHere.ties
+                nxtidx,nxtTr = srchFrmHere.select_next()   # break a possible tie btwn branches leaving this pt.
                 self.path.append(nxtTr)
                 self.idxpath.append(nxtidx)
                 latestIdx = nxtidx
-                #self.Tcost += search.cmin
             self.Tcost = cost_idxp(costtype, self.idxpath)  # compute total cost of the path
 
             REPORTHISTO = False
@@ -1032,7 +1031,7 @@ class path3D:
             error("we're not doing BASIC mode anymore")
 
     def check(self): # 3D
-        if len(self.path) != N**6-1:
+        if len(self.path) != Npts-1:
             error('wrong path length '+str(len(self.path)))
         i=0
         for t in self.path:
@@ -1153,7 +1152,7 @@ def main():
     r,c = np.shape(c1.m)
 
     assert r==c
-    assert r == N**6
+    assert r == Npts
 
     p1 = point3D(getcoord(1234))
     p2 = point3D(getcoord(3241))
@@ -1177,8 +1176,8 @@ def main():
     print('DT_START: ',DT_START)
     print('AMAX: ',AMAX)
     for i in range(10):
-        p1 = point3D(getcoord(random.randint(0,N**6-1)))
-        p2 = point3D(getcoord(random.randint(0,N**6-1)))
+        p1 = point3D(getcoord(random.randint(0,Npts-1)))
+        p2 = point3D(getcoord(random.randint(0,Npts-1)))
         tr12.p1 = p1
         tr12.p2 = p2
         tr12.constrain_A()
