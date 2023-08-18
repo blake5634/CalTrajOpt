@@ -61,12 +61,16 @@ def configure(fp=None):
 
         if parname =='costtype':
             if v not in ['time','energy']:
-                error('path.configure: unknown cost type: '+v)
+                error('configure(): unknown cost type: '+v)
             costtype = v
         if parname =='gridType':
             if v not in ['random','rectangular']:
-                error('path.configure: unknown gridType: '+v)
+                error('configure(): unknown gridType: '+v)
             gridType = v
+        if parname == 'SPACE':
+            SPACE = v
+            if v not in(['2D','3D']):
+                error('configure(): SPACE must be "2D" or "3D" not ',v)
         if parname == 'amax':
             AMAX = float(v)
         if parname == 'dt_start': # starting val for constrain_A()
@@ -75,13 +79,17 @@ def configure(fp=None):
             DT_TEST = dt_test  # fixed dt value used for testing
         if parname == 'N':
             N = int(v)
-            M = Npts  # number of grid points
         if parname == 'NPC':  #n time pts in trajectory
             NPC = int(v)
         if parname == 'startrow':
             startrow = int(v)
         if parname == 'startcol':
             startcol = int(v)
+
+    if SPACE == '2D':  # do this after all options read
+        Npts = N*N
+    else:
+        Npts = N**6
 
 
 #def ij2idx(i,j):
@@ -555,17 +563,17 @@ class search_from_curr_pt:
                                     index = getidx(ivect)
                                     function(index,ivect)
 
-    def find_cmin(self,index,ivect):  # should be called by iterate as first step.
-        if self.mark[index]: # index = Cm.m column
+    def find_cmin(self,p2idx,ivect):  # should be called by iterate as first step.
+        if self.mark[p2idx]: # index = Cm.m column
+            self.IsawOne = True
             p1idx = self.pstartIdx
-            p2idx = index
             if p1idx != p2idx:
                 tc = self.eval_cost(p1idx,p2idx)
                 #print('         find_cmin: ', tc, self.cmin)
                 ##x = input('  ... pause (CR) ...')
                 if tc < self.cmin:
                     self.cmin   = tc
-                    self.minidx = index
+                    self.minidx = p2idx
                     self.cminFound = True
 
     def eval_cost(self,i1,i2):
@@ -953,7 +961,7 @@ class path3D:
         # return path object, float
         return pmin,pmin.Tcost
 
-    def heuristicSearch3D(self, idx1,profiler=None):
+    def heuristicSearch3D(self, idx1, profiler=None):
         ADVANCED = True
         BASIC = not ADVANCED  # we're just not going to do BASIC anymore
 
@@ -969,32 +977,55 @@ class path3D:
 
         if ADVANCED:
             self.Tcost = 0.0
-            self.path = []
+            self.path = [pts[startPtIdx]]
             self.idxpath = [startPtIdx] # path has a start point
             self.nmin_max = 0
             latestIdx = startPtIdx
-            while len(self.path) < Npts-1:  # we don't search FROM the last point
+            #while len(self.path) < (Npts):
+            updaterate = Npts//10
+            while True:
                 li = len(self.path)
-                if li%20==0:
-                    print('path pt: ',li)
+                if li%updaterate==0:
+                    pct = 1+int(100.0 * li / Npts)
+                    print(f' completion: {pct:2}%')
                 srchFrmHere = search_from_curr_pt(self.mark,self)
                 srchFrmHere.cmin = 99999999 # just being sure/clear
                 srchFrmHere.pstartIdx = latestIdx  # updated at end of this loop!
                 srchFrmHere.minTrs=[] #these will hold all branches matching cmin cost.
                 srchFrmHere.minidxs=[]
+                srchFrmHere.IsawOne = False
 
-                # iteration through the open branches from this node
+                ### iteration through the open branches from this node
                 srchFrmHere.iterate(N,srchFrmHere.find_cmin)
+                #gate = li > 725 or li < 4
+                gate = False
+                if gate:
+                    print(f'{li}: Started at: {latestIdx}: any?: {srchFrmHere.IsawOne}, minfound: {srchFrmHere.cminFound}, mincost: {srchFrmHere.cmin}')
                 if not srchFrmHere.cminFound:
                     error('heuristic search iteration: somethings wrong, need to find_cmin before find_all')
                 srchFrmHere.iterate(N,srchFrmHere.find_all_cminTrs)
+                ###
 
-                if srchFrmHere.ties > self.maxTiesHSearch:  # keep track of greatest number of ties along this path
+                # keep track of greatest number of ties along this path
+                if srchFrmHere.ties > self.maxTiesHSearch:
                     self.maxTiesHSearch = srchFrmHere.ties
+
+                if gate:
+                    print(f'     Ties: {len(srchFrmHere.minidxs)}/{len(srchFrmHere.minTrs)}')
                 nxtidx,nxtTr = srchFrmHere.select_next()   # break a possible tie btwn branches leaving this pt.
+                if gate:
+                    print(f' ...   appending {nxtidx}')
+                    if nxtidx in self.idxpath:
+                        print(f'      {idxpath} is already in!')
                 self.path.append(nxtTr)
+                if gate:
+                    print(f'     after append, len(self.path)={len(self.path)}')
                 self.idxpath.append(nxtidx)
                 latestIdx = nxtidx
+                if gate:
+                    print(f'      exit condition: {len(self.path)},{Npts}-> {len(self.path) >= Npts}')
+                if len(self.path) >= Npts:
+                    break
             self.Tcost = cost_idxp(costtype, self.idxpath)  # compute total cost of the path
 
             REPORTHISTO = False

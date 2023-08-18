@@ -99,6 +99,7 @@ def main(args):
     else:
         Npts = N**6
     cto.M = Npts
+    cto.Npts = Npts
     #
     #   Choose search type
     #
