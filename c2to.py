@@ -613,8 +613,6 @@ class search_from_curr_pt:
         return ti,tr #chosen next traj index, chosen next traj trajectory
 
     def find_all_cminTrs(self,index,v): # find a list of all next pts for which cost ~= cmin
-        if not self.cminFound:
-            error('search.find_all_cminTrs: somethings wrong, need to find_cmin before find_all')
         epsilon = self.cmin * 0.02 # define 'close'
         if self.mark[index]:
             tc = self.eval_cost(self.pstartIdx,index)  # get cost for this branch
@@ -975,17 +973,20 @@ class path3D:
             self.idxpath = [startPtIdx] # path has a start point
             self.nmin_max = 0
             latestIdx = startPtIdx
-            while len(self.path) <= Npts:
+            while len(self.path) < Npts-1:  # we don't search FROM the last point
                 li = len(self.path)
                 if li%20==0:
                     print('path pt: ',li)
                 srchFrmHere = search_from_curr_pt(self.mark,self)
                 srchFrmHere.cmin = 99999999 # just being sure/clear
-                srchFrmHere.pstartIdx = latestIdx
+                srchFrmHere.pstartIdx = latestIdx  # updated at end of this loop!
                 srchFrmHere.minTrs=[] #these will hold all branches matching cmin cost.
                 srchFrmHere.minidxs=[]
+
                 # iteration through the open branches from this node
                 srchFrmHere.iterate(N,srchFrmHere.find_cmin)
+                if not srchFrmHere.cminFound:
+                    error('heuristic search iteration: somethings wrong, need to find_cmin before find_all')
                 srchFrmHere.iterate(N,srchFrmHere.find_all_cminTrs)
 
                 if srchFrmHere.ties > self.maxTiesHSearch:  # keep track of greatest number of ties along this path
