@@ -633,7 +633,7 @@ class search_from_curr_pt:
             self.path.nmin_max = len(self.minTrs)
         self.ties = len(self.minidxs) #how many ties at this node??
 
-MAXTIEHISTO = 100  # how many bins for the tie frequency histogram
+MAXTIEHISTO = 80  # how many bins for the tie frequency histogram
 
 class path3D:
     #def __init__(self,Cm):
@@ -945,17 +945,14 @@ class path3D:
                 median += n
             median /=2
             df.metadata.d['Median Ties']=median
-            for i,n in enumerate(self.tie_freq):
-                #sum += int(n)
-                #if sum < median and medianflag :
-                    #fmt = fmtstring1
-                #elif medianflag:
-                    #fmt = fmtstring2
-                    #medianflag = False
-                #else:
-                    #fmt = fmtstring1
+            for i,nst in enumerate(self.tie_freq):
+                n = int(nst)
                 if i>1:
-                    print(fmtstring1.format(i,int(n),np.log10(int(n))),file=fp)
+                    if n == 0:
+                        tlv = -1.0 # tmp log value
+                    else:
+                        tlv = np.log10(n)
+                    print(fmtstring1.format(i,n,tlv),file=fp)
             fp.close()
         df.close()
         # return path object, float
