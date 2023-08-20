@@ -122,8 +122,8 @@ def main(args):
     #
     #   Choose cost type
     #
-    #cto.costtype = 'time'
-    cto.costtype = 'energy'
+    cto.costtype = 'time'
+    #cto.costtype = 'energy'
     cto.NPC = 30   #  # of simulation points in 0-dt time interval
     #
     ##########################################################################
@@ -143,6 +143,7 @@ def main(args):
 
         # create the datafile:
         df = bd.datafile('6Dsearching','BH','simulation')
+        df.metadata.d['Computer Name'] = cto.PCNAME
         if gridtype == 'random':
             df.metadata.d['Random Grid'] = True
         else:
@@ -184,6 +185,7 @@ def main(args):
             if gridtype != 'random':
                 cto.error('Somethings wrong with search config: generate not random')
             df = bd.datafile(f'2DrandomGrid{N}x{N}PointSet','BH','simulation')
+            df.metadata.d['Computer Name'] = cto.PCNAME
             codeFolder = ''
             df.set_folders(pointsDataFolder,codeFolder) # also creates filename
             c1.fill(gt)  # randomize and compute traj's and costs
@@ -203,6 +205,7 @@ def main(args):
                 pointSourceHash = gt.readPoints2D(dfr)  #read in the set of random points
             c1.fill(gt) # calc trajectories and costs after points reading
             dfw = bd.datafile('2Dsearching','BH','simulation')
+            dfw.metadata.d['Computer Name'] = cto.PCNAME
             dfw.set_folders(DataFolder,'')
             if gridtype=='random':
                 dfw.metadata.d['Points Data Source'] = pointsHash
