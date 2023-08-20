@@ -1,20 +1,20 @@
 # Trajectory Optimization 
 ## Versions / branches
- * main:   1D motion in 2D phase space
 
- * 3D:      3D motion in 6D phase space
+The two branches ('main'/2D, 'multiOpt'/6D) are now merged!
 
- the two branches can not be easily merged unfortunately.
+To do a search:
 
-## How to use:
-0) change to your desired branch
-1) edit ctoConfig.txt to change parameters
-2) python3 searchOpt.py  -1
+Usage:
 
-command line argument for searchOpt.py selects which trajectory to plot on the grid.  -1 means plot all trajectories.
+ 1) Generate points data file (for random grid re-use):
 
-3) in 3D mode, the plotting is a separate program:
-```
-> python3 animate3D.py <<FILENAME.csv>>
-```
+    `>p3 searchOpt.py generate`
 
+ 2) Search a stored random grid:
+
+    `>p3 searchOpt.py hhhhhh`  (hash code of grid points file)
+
+ 3) Search a rectangular grid:
+
+    `>p3 searchOpt.py rect`

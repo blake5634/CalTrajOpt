@@ -3,28 +3,34 @@
 #import numpy as np
 import c2to as cto
 import sys
+import os
+import pickle
 import brl_data.brl_data as bd
 import datetime as dt
 import numpy as np
 
-
+usageString = '''
 #  Usage:
 #
-# 1) Generate points data file (for random grid re-use)
+# 1) Generate points data file (for random grid re-use):
 #
 #    >p3 searchOpt.py generate
 #
-# 2) Search a stored random grid
+# 2) Search a stored random grid:
 #
 #    >p3 searchOpt.py hhhhhh  (hash code of grid points file)
 #
-# 3) Search a rectangular grid
+# 3) Search a rectangular grid:
 #
-#    >p3 searchOpt.py
+#    >p3 searchOpt.py rect
 #
+'''
 
 def main(args):
-    cto.configure()
+    if len(args) < 2 or len(args)>3:
+        print(usageString)
+        cto.error(' bad command line ')
+    cto.configure()  # can be overridden below
     ###################################################
     #    Process command line
     #
@@ -35,6 +41,9 @@ def main(args):
         gridtype = 'random'   # 2 arg version always 'random'
         if args[1].startswith('gen'):
             OP_MODE = 'generate'
+        elif args[1].startswith('rec'):
+            OP_MODE = 'search'
+            gridtype = 'rectangular'  # 1 arg version never random grid
         else: # we got a hashcode
             OP_MODE = 'search'
             pointsHash = args[1]
@@ -57,17 +66,21 @@ def main(args):
     #pointsDataFolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/PointSetsRandom'
     #pointsFilename = pointsDataFolder + '/'+pointsDataName  # full path of points file
 
-    if OP_MODE == 'search' and gridtype == 'random':  # we need to read points file
-        # find points file by its hash
-        myf = bd.finder()
-        myf.set_dirs([DataFolder+PointsFolder])
-        print(f' search random looking in {DataFolder+PointsFolder}')
-        keys = [pointsHash, '.csv']            # look for requested rand points file
-        print(f'               looking for {pointsHash}')
-        fns = myf.findh(keys)
-        pointsDataFolder = fns[0][0]  # should be same as .set_dirs above
-        pointsDataName   = fns[0][1]
-        pointsFilename = pointsDataFolder + '/'+pointsDataName  # full path of points file
+    cto.gridType = gridtype
+    ###################################################
+    # some sanity checks
+    if OP_MODE not in ['generate', 'search']:
+        cto.error('searchOpt.py: illegal POINTS MODE')
+    if OP_MODE == 'generate' and gridtype != 'random':
+        cto.error('SearchOpt: Cannot generate points file unless grid is random')
+    ###################################################
+
+    DataFolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS'
+    PointsFolder = '/PointSetsRandom'
+    pointsDataFolder = DataFolder + PointsFolder
+    #pointsDataFolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/PointSetsRandom'
+    #pointsFilename = pointsDataFolder + '/'+pointsDataName  # full path of points file
+
 
     ##########################################################################
     #
@@ -76,19 +89,31 @@ def main(args):
     SPACE = '2D'
     #SPACE = '6D'
 
+    if SPACE not in ['2D', '6D']:
+        cto.error(' must select space from 2D or 6D')
+
     #  gridtype is set by command line args (see above)
 
     cto.N = 3
-    cto.M = cto.N*cto.N
     N = cto.N
+    if SPACE == '2D':
+        Npts = N*N
+    else:
+        Npts = N**6
+
+    cto.M = Npts
+    cto.Npts = Npts
 
     #
     #   Choose search type
     #
     ##SEARCHT = 'heuristic search' # greedy nearest neighbor (working??)
     #SEARCHT = 'exhaustive'   # enumerate all paths (formerly 'brute force') (2D only!)
-    #SEARCHT = 'sampling search' # nsearch random paths
+    SEARCHT = 'sampling search' # nsearch random paths
     SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
+
+    #searchType = SEARCHT  # still need this???
+
     #
     #   Choose search size
     #
@@ -96,13 +121,13 @@ def main(args):
     #nsearch = 1000000  # 1M
     #nsearch =
     nsearch = 4*N*N   # 4 searches from each starting pt
-    #nsearch = 4
+    nsearch = 4
 
     #
     #   Choose cost type
     #
-    #cto.costtype = 'time'
-    cto.costtype = 'energy'
+    cto.costtype = 'time'
+    #cto.costtype = 'energy'
     cto.NPC = 30   #  # of simulation points in 0-dt time interval
     #
     ##########################################################################
@@ -129,7 +154,7 @@ def main(args):
 
         if OP_MODE == 'generate':
             if gridtype != 'random':
-                cto.error('Somethings wrong with search config: generate not random')
+                cto.error('Somethings wrong with search config: 2D generate not random')
             df = bd.datafile(f'2DrandomGrid{N}x{N}PointSet','BH','simulation')
             codeFolder = ''
             df.set_folders(pointsDataFolder,codeFolder) # also creates filename
@@ -155,7 +180,7 @@ def main(args):
                 dfw.metadata.d['Points Data Source'] = pointsHash
             else:
                 dfw.metadata.d['Points Data Source'] = 'Regular Grid'
-            q = input('Research Question for this search: ')
+            q = input('Research Question for this 2D search: ')
             dfw.metadata.d['Research Question'] = q
             print(f"RQ0: {dfw.metadata.d['Research Question']}")
             # instantiate a path:
@@ -183,50 +208,73 @@ def main(args):
     #    6D version
     #
     if SPACE == '6D':
-        # create the datafile:
-        df = bd.datafile('6Dsearching','BH','simulation')
-        df.set_folders('/home/blake/Sync/Research/CalTrajOpt_RESULTS','')
-
-        df.metadata.d['Research Question'] = q
-
-
-        # memory profiling
-        mem_snap('created datafile')
-
-
-        # memory profiling
-        #start_tracker([cto.Cm, cto.point3D,cto.path3D,bd.datafile])
-        start_tracker([cto.search_from_curr_pt,cto.path3D])
-
-        # read in some params from config file
-        cto.configure()
-        idx = int(args[1])
-
-        pts = cto.setupPoints()   # just store points instead of cost matrix Cm
-        #c1 = cto.Cm(df = df)  # cost matrix
-
-        if RANDOMGRID:
-            df.metadata.d['Random Grid'] = True
-            cto.gridType = 'random'
-        else:
-            df.metadata.d['Random Grid'] = False
-            cto.gridType = 'rectangular'
 
         #
-        # compute a path:
-        #p = cto.path3d(gt,c1)
-        p = cto.path3D()
+        # create grid
+        gt = cto.grid6D(cto.N)
+        # create cost matrix
+        c1 = cto.Cm6D()
+        if gridtype == 'random':
+            gt.randgrid = True
+            c1.set_GridRandomize()  # select random instead of grid
 
-        p.search(searchType,dfile=df,nsamples=nsamp,profiler=mem_snap)
-        # search will close the datafile
+        if OP_MODE == 'generate':
+            if gridtype != 'random':
+                cto.error('Somethings wrong with search config: 6D generate not random')
+            df = bd.datafile(f'6DrandomGrid{N}x{N}PointSet','BH','simulation')
+            df.metadata.d['Random Grid'] = True
+            codeFolder = ''
+            df.set_folders(pointsDataFolder,codeFolder) # also creates filename
+            c1.fill(gt)  # randomize and compute traj's and costs
+            df.metadata.d['grid info'] = f'{N}x{N} random grid, {N*N} pts.'
+            gt.savePoints6D(df) #this will set the 'Research Question' to "RandomGridPointSet"
+            print(f'Random pts saved to {df.name}')
+            notes = f'generated random points file: {df.hashcode} {cto.N}x{cto.N}'
+            logentry(df,notes)
+            print(f'\n\n               your points data file hash is:',df.hashcode)
 
-        q = df.metadata.d['Research Question']
-        notes = '{:}, grid: {:}, n={:}, {:}, cost: {:4.2f} ({:})'.format(searchType, cto.gridType, nsamp,dim, df.metadata.d['Min Cost'], cto.costtype)
-        logentry(df,notes)
-        ####
 
-        print('Completed: see results at ',df.hashcode)
+        elif OP_MODE == 'search': # search mode with rect grid or read-in points
+            if gridtype == 'random': # we should read from file for repeatability
+                # create the random points file reader
+                dfr = bd.datafile('','','') #'' ok for reading
+                dfr.set_folders('','') # '' ok for reading
+                dfr.name = pointsFilename
+                pointSourceHash = gt.readPoints2D(dfr)  #read in the set of random points
+            # not for 6D: c1.fill(gt) # calc  costs after points reading
+            dfw = bd.datafile('6Dsearching','BH','simulation')
+            dfw.set_folders(DataFolder,'')
+            cto.pts = cto.setupPoints6D()   # just store points instead of cost matrix Cm
+            if gridtype=='random':
+                dfw.metadata.d['Points Data Source'] = pointsHash
+            else:
+                dfw.metadata.d['Points Data Source'] = 'Regular Grid'
+            q = input('Research Question for this 6D search: ')
+            dfw.metadata.d['Research Question'] = q
+            if gridtype == 'random':
+                dfw.metadata.d['Random Grid'] = True
+            else:
+                dfw.metadata.d['Random Grid'] = False
+            # instantiate a path:
+            p = cto.path3D()
+            # search will close the datafile
+            path2, cmin = p.search(SEARCHT, dfile=dfw, nsamples=nsearch)
 
+            print('Optimal path returned: (tra)', path2.path)
+            print('Optimal path returned: (idx)', path2.idxpath)
+            # is it a valid path?
+            #p.check()
+            if gridtype=='random':
+                notes = f"Search Result: Rand-grid({pointSourceHash}), {SEARCHT}, cost: {cmin:.1f} ({cto.costtype})"
+                print(f'\n\n               your search results file hash is: {dfw.hashcode} using grid {pointSourceHash}.')
+            else:
+                notes = f"Search Result: {gridtype} grid, {SEARCHT}, cost: {cmin:.1f} ({cto.costtype})"
+                print(f'\n\n               your search results file hash is: {dfw.hashcode}.')
+            print(f"RQ2: {dfw.metadata.d['Research Question']}")
+            #  keep a "log book"
+            logentry(dfw,notes)
+            # graph the optimal search result (best path)
+            path2.plot(-1,notes)
 
 def logentry(df,notes):
     logdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
@@ -243,6 +291,7 @@ def logentry(df,notes):
     else:
         print(f'RQ: {q}')
         print(f'debugging detected. {df.hashcode} will not be logged to {logdir+logfilename}')
+
 
 if __name__ ==  '__main__':
     main(sys.argv)

@@ -112,8 +112,8 @@ def main(args):
             #c2[i] *= scale
         plt.plot(xs[ip],curve)
     #round up maxx by 1000
-    maxx = (maxx//100 + 1)*100
-    maxx = 100
+    maxx = (maxx//1000 + 1)*100
+    #maxx = 1000
     # plot relative to 0 for visual comparison
     plt.xlim([0,maxx])
     plt.title('{:} cost distributions'.format(ct1))

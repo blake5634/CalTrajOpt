@@ -3,6 +3,15 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# data files and docs
+*.csv
+*_meta.json
+*.pdf
+*.cfg
+*.png
+#
+#dependent package
+brl_data/
 # C extensions
 *.so
 

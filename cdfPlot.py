@@ -19,6 +19,7 @@ def main(args):
             '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data',
             '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data/Gold'
             ]
+<<<<<<< HEAD
     goalhash =   args[1]
     myff = bd.finder()
     myff.set_dirs(dirs)
@@ -40,6 +41,7 @@ def main(args):
 
     print('opening ', dfdir + '/'+ dfname)
     fullhash = bd.getHashFromFilename(dfname)
+
     df = bd.datafile('', '','')  # open it with blank title info
     df.set_folders(dfdir,'')        # set these to wherever you want to open datafiles
     df.open('r',tname=dfdir+'/'+dfname)
