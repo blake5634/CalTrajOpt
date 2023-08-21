@@ -63,24 +63,9 @@ def main(args):
     DataFolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS'
     PointsFolder = '/PointSetsRandom'
     pointsDataFolder = DataFolder + PointsFolder
-    #pointsDataFolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/PointSetsRandom'
-    #pointsFilename = pointsDataFolder + '/'+pointsDataName  # full path of points file
+    pointsFilename = pointsDataFolder + '/'+pointsDataName  # full path of points file
 
     cto.gridType = gridtype
-    ###################################################
-    # some sanity checks
-    if OP_MODE not in ['generate', 'search']:
-        cto.error('searchOpt.py: illegal POINTS MODE')
-    if OP_MODE == 'generate' and gridtype != 'random':
-        cto.error('SearchOpt: Cannot generate points file unless grid is random')
-    ###################################################
-
-    DataFolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS'
-    PointsFolder = '/PointSetsRandom'
-    pointsDataFolder = DataFolder + PointsFolder
-    #pointsDataFolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/PointSetsRandom'
-    #pointsFilename = pointsDataFolder + '/'+pointsDataName  # full path of points file
-
 
     ##########################################################################
     #
@@ -88,12 +73,10 @@ def main(args):
     #
     SPACE = '2D'
     #SPACE = '6D'
-
     if SPACE not in ['2D', '6D']:
         cto.error(' must select space from 2D or 6D')
 
     #  gridtype is set by command line args (see above)
-
     cto.N = 3
     N = cto.N
     if SPACE == '2D':
@@ -108,19 +91,17 @@ def main(args):
     #   Choose search type
     #
     ##SEARCHT = 'heuristic search' # greedy nearest neighbor (working??)
-    #SEARCHT = 'exhaustive'   # enumerate all paths (formerly 'brute force') (2D only!)
-    SEARCHT = 'sampling search' # nsearch random paths
-    SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
+    SEARCHT = 'exhaustive'   # enumerate all paths (formerly 'brute force') (2D only!)
+    #SEARCHT = 'sampling search' # nsearch random paths
+    #SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
 
     #searchType = SEARCHT  # still need this???
 
     #
     #   Choose search size
     #
-    #nsearch = int(np.math.factorial(N*N) * 0.10)  # 10% of 3x3
+    nsearch = int(np.math.factorial(N*N) * 0.10)  # 10% of 3x3
     #nsearch = 1000000  # 1M
-    #nsearch =
-    nsearch = 4*N*N   # 4 searches from each starting pt
     nsearch = 4
 
     #

@@ -1399,6 +1399,36 @@ class path2D:
         #time.sleep(0.5)
         return self, self.T_cost
 
+    def compute_curves(self,idx):
+        if type(idx) == type(5):
+            idx = [idx]
+        elif type(idx) != type([5]):
+            error('compute_curves: idx is not an int or a list')
+        curvepts_x = []
+        curvepts_v = []
+        if idx[0] < 0: # idx=-1 is a flag for all of the path
+            idx = range(len(self.path))
+        for i,tr in enumerate(self.path):
+            if i in idx:
+                if i == len(self.path):
+                    break
+                if not tr.valid:
+                    error('compute_curves(): I shouldnt have found an invalid trajectory in path: '+str(i))
+                if tr is None:
+                    error('null traj: '+ str(i) + str(tr))
+                if not tr.computed and not tr.constrained:
+                    error('Cant plot until trajectory is computed and constrained '+ str(i) + str(tr))
+                dt = tr.dt
+                for i in range(NPC):
+                    t = dt*i/NPC
+                    curvepts_x.append(tr.x(t))
+                    curvepts_v.append(tr.xd(t))
+                curvepts_x.append(tr.x(dt))
+                curvepts_v.append(tr.xd(dt))
+        return curvepts_x,curvepts_v
+
+
+
     # plot grid and trajectories (2D only)
 
     def plot(self,idx, note=''): # plot a path with trajectories
@@ -1424,7 +1454,6 @@ class path2D:
         y_values = [traj.p1.v for traj in self.path]
         x_values.append(self.path[-1].p2.x)
         y_values.append(self.path[-1].p2.v)
-        print(f'plotOnePath: len(xvals): {len(x_values)}')
         ax = plt.gca()
         ax.plot(x_values, y_values, 'o')
         arrow_positions = np.array([x_values, y_values]).T
@@ -1439,6 +1468,25 @@ class path2D:
         tr = self.path[0]
         startpt = plt.Circle((tr.p1.x,tr.p1.v),0.05,color='green')
         ax.add_patch(startpt)
+
+        plt.quiver(
+            arrow_positions[:, 0],
+            arrow_positions[:, 1],
+            arrow_directions[:, 0],
+            arrow_directions[:, 1],
+            scale=1,
+            scale_units='xy',
+            angles='xy',
+            width=0.005,
+            color='red'
+        )
+
+        # get curves for each arc
+        cx, cy = self.compute_curves(-1) #compute trajectory path
+        ax.plot(cx,cy,color='blue')
+        axlim = 2
+        ax.set_xlim([-axlim,axlim])
+        ax.set_ylim([-axlim,axlim])
 
     def plotDone(self,figure):
         plt.show()
@@ -1980,18 +2028,6 @@ class path3D:
                 if self.path[i-1].p2 != t.p1:
                     error('discontinuous path: '+str(i-1)+' '+str(i))
             i+=1
-
-
-
-    def compute_curves(self,idx):
-        if type(idx) == type(5):
-            idx = [idx]
-        elif type(idx) != type([5]):
-            error('compute_curves: idx is not an int or a list')
-        curvepts_x = []
-        curvepts_v = []
-        if idx[0] < 0: # idx=-1 is a flag for all of the path
-            idx = range(len(self.path))
 
     def compute_curves6D(self,idx): #3D
         curvepts_x = []
