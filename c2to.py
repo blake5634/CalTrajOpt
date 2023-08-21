@@ -88,7 +88,7 @@ def configure(fp=None):
 
 #  'i,j' 'r,c', 'row,col' are used kind of interchangeably
 #   to indicate point in rectangular grid ... sorry!
-def ij2idx(i,j):   #  0-N*N-1
+def ij2idx(i,j):   #  0-Npts-1
     return i*N+j
 def idx2ij(idx):   #  0-N, 0-N
     i = idx//N
@@ -145,7 +145,7 @@ class grid2D:
         # read in pair of points for each Cm.m entry and store trajectory.
         ptindex = 0
         for row in df.reader:
-            i = int(row[0])  # 0 -- N*N-1
+            i = int(row[0])  # 0 -- Npts-1
             j = int(row[1])
             print(f"I'm creating point at {i}, {j}")
             p1 = point2D(i,j)
@@ -157,28 +157,6 @@ class grid2D:
         self.fromFile = True
         # return the file name from which the pts were read for the record
         return df.hashcode
-
-***************************  class  grid6d()???
-
-    def savePoints6D(self,df):   # save points generated into a file
-        if not self.randgrid:
-            error('savePoints2D: Do not save points if they are not random')
-        # each entry in Cm is a trajectory2D  we need only store p1 and p2
-        it =str(type(5))
-        ft =str(type(3.14159))
-        df.metadata.d['Types'] = [it,it,ft,ft]
-        df.metadata.d['Names'] = ['i1','j1','x1','v1']
-        df.metadata.d['Ncols'] = len(df.metadata.d['Names'])
-        df.descript_str = 'randomGridPointSet' # standardize for point storage filename fields
-        df.metadata.d['Research Question'] = 'RandomGridPointSet' # standardize for RQ
-        df.open('w')
-        # write out key info for each point.
-        for i in range(N):
-            for j in range(N):
-                p1 = self.gr[i][j]
-                row = [i,j, p1.x, p1.v ]
-                df.write(row)
-        df.close()
 
 #  convert between 6D int coordinates and point index
 def getidx6D(v):
@@ -194,9 +172,10 @@ def getcoord6D(idx):
 
 def setupPoints6D():
     global pts, Cm
-    Cm = Cm() # initially all zeros
+    Cm = Cm6D() # initially all zeros
     pts = []
     if gridType == 'random':
+        print(f'TEST:  generating random grid: {Npts} rows')
         for i in range(Npts):
             newpt = point3D(getcoord6D(i))
             newpt.randomize()
@@ -210,6 +189,31 @@ def setupPoints6D():
     print('')
     print(f'setupPoints6D generated {len(pts)} points')
     return pts
+
+def savePoints6D(df):   # save points generated into a file
+    # each entry in Cm is a trajectory2D  we need only store p1 and p2
+    it =str(type(5))
+    ft =str(type(3.14159))
+    df.metadata.d['Types'] = [it]*6 + [ft]*6
+    # Names =    ['i1','j1','x1','v1']
+    df.metadata.d['Names'] = [f'c{i}' for i in range(6)]+[f'x{i}' for i in range(6)]
+    df.metadata.d['Ncols'] = len(df.metadata.d['Names'])
+    if df.metadata.d['Ncols'] != 12:
+        error('somethings wrong in savePOitns6D')
+    df.descript_str = 'randomGridPointSet' # standardize for point storage filename fields
+    df.metadata.d['Research Question'] = 'RandomGridPointSet' # standardize for RQ
+    df.open('w')
+    # write out key info for each point.
+    for idx in range(Npts):
+        p1 = pts[idx]  # precomputed points
+        #row = [i,j, p1.x, p1.v ]
+        row = []
+        for i2 in getcoord6D(idx):
+            row.append(i2)
+        row = p1.ivect
+        row += p1.xvect
+        df.write(row)
+    df.close()
 
 def predict_timing(df, searchtype, systemName, nsamp):
     #
@@ -704,7 +708,7 @@ class trajectory3D:
 
 class Cm: # matrix full of trajectory2D objs
     def __init__(self,df=None):
-        self.m = [[ 0 for x in range(N*N)] for y in range(N*N)]
+        self.m = [[ 0 for x in range(Npts)] for y in range(Npts)]
         # normally the points are in a regular 6 dim grid.  if Randgrid
         # is true, they will be converted into uniform([-1,1)) in all coordinates
         self.randgrid = False
@@ -734,8 +738,8 @@ class Cm: # matrix full of trajectory2D objs
         else: # no file and not random: non random grid
             pass # grid should already have x,v coordinates
         # now get a tr (and costs) for all possible transitions (row x col)
-        for i1 in range(N*N):
-            for j1 in range(N*N):
+        for i1 in range(Npts):
+            for j1 in range(Npts):
                 r1,c1 = idx2ij(i1)
                 r2,c2 = idx2ij(j1)
                 p1 = grid.gr[r1][c1]
@@ -844,15 +848,15 @@ class Cm6D:  # save memory, Cm.m only contains cost pair ct,ce
                     else:
                         self.m[i1][j1] = (ct,ce)
         print('done with fill...')
-        print('# of self-state (invalid) transitions: ',nselftr, ' (expected N*N): ', N*N)
+        print('# of self-state (invalid) transitions: ',nselftr, ' (expected Npts): ', Npts)
 
     def __repr__(self):
         res = 'Cm cost matrix:\n'
-        if N*N > 100:
+        if Npts > 100:
             error('Cm is too big to print out!')
         else:
-            for i in range(N*N):
-                for j in range(N*N):
+            for i in range(Npts):
+                for j in range(Npts):
                     res += ' {:5.1f}'.format(self.m[i][j].cost_t)
                 res += '\n'
         return res
@@ -898,11 +902,11 @@ class path2D:
     def __init__(self,grid,Cm):
         self.Cm = Cm      # cost matrix (actually trajectories)
         self.grid = grid
-        self.mark = [True for x in range(N*N)]
+        self.mark = [True for x in range(Npts)]
         #self.mark[self.sr*N+self.sc] = False # mark our starting point
         self.Tcost = 0.0
         self.path = []  # the path as a list of trajectories
-        self.idxpath = [] # the path as a list of indeces (0..N*N)
+        self.idxpath = [] # the path as a list of indeces (0..Npts)
         self.searchtype = 'none yet'
         self.datafile = None
         #collect tie stats on this path
@@ -964,7 +968,7 @@ class path2D:
     def bruteForce(self,dfile=None,sampling=False,nsamples=0): # path class
         if self.searchtype.startswith('none'):
             self.searchtype = 'exhaustive'
-        n_all_paths = math.factorial(N*N)
+        n_all_paths = math.factorial(Npts)
         print('Starting {:} search: N={:}'.format(self.searchtype,N))
         if sampling:
             print(f'   Sampling {nsamples} paths out of {float(n_all_paths):12.5e}')
@@ -988,10 +992,10 @@ class path2D:
             print('Saving permutations (paths) to: ',dfbf.name)
             itype = str(type(5))
             ftype = str(type(3.1415))
-            tps = [itype]*(N*N)      # path point seq
+            tps = [itype]*(Npts)      # path point seq
             tps.append(ftype) # the path cost's type
             names = []
-            for i in range(N*N):
+            for i in range(Npts):
                 names.append(f'p{i}')
             names.append('Cost')
             dfbf.metadata.d['Ncols'] = len(names)
@@ -1006,15 +1010,15 @@ class path2D:
 
         ##1) list all possible paths
         if not sampling:
-            print('We are about to find all paths through ',N*N,' nodes')
+            print('We are about to find all paths through ',Npts,' nodes')
             x=input('ready?..')
-            piter = itt.permutations(range(N*N),N*N) # not a list!
+            piter = itt.permutations(range(Npts),Npts) # not a list!
         else:
-            print('We are generating {:} random paths through {:} nodes'.format(nsamples,N*N))
+            print('We are generating {:} random paths through {:} nodes'.format(nsamples,Npts))
             piter = []
             phashset = set() # just for detection dupes
             while len(phashset) < nsamples:
-                p = list(range(N*N))
+                p = list(range(Npts))
                 random.shuffle(p) # generate a path as random list of indices
                 pthash = ''
                 for j in p:
@@ -1130,10 +1134,10 @@ class path2D:
         print('Saving permutations (paths) to: ',df.name)
         itype = str(type(5))
         ftype = str(type(3.1415))
-        tps = [itype]*(N*N)      # path point-index sequence
+        tps = [itype]*(Npts)      # path point-index sequence
         tps.append(ftype) # the path cost's type
         names = []
-        for i in range(N*N):
+        for i in range(Npts):
             names.append('p{:}'.format(i))
         names.append('Cost')
         df.metadata.d['Types'] = tps
@@ -1153,17 +1157,17 @@ class path2D:
         cmin = 99999999999
         cmax = 0
         maxTies = 0
-        if nsearch > 2*N*N:  # for big enough searches, allocate same # to all start points
-            nperstart = nsearch//(N*N)
+        if nsearch > 2*Npts:  # for big enough searches, allocate same # to all start points
+            nperstart = nsearch//(Npts)
             MULTI_SEARCH_PER_PT = True
-            print(f'searching the {N*N} start points {nperstart} times each.')
+            print(f'searching the {Npts} start points {nperstart} times each.')
         else:
             nperstart = nsearch   # if less, just pick random start points
             MULTI_SEARCH_PER_PT = False
             print(f'searching {nperstart} random start pts, once each.')
 
         x = input('.....  db pause...')
-        for i in range(N*N-1): # go through the start pts
+        for i in range(Npts-1): # go through the start pts
             if MULTI_SEARCH_PER_PT:
                 if i%2000==0:
                     print('MH Search iteration: ',i)  #I'm alive
@@ -1173,7 +1177,7 @@ class path2D:
                 # reset search info
                 if not MULTI_SEARCH_PER_PT:
                     # a random start point
-                    startPtIdx = random.randint(0,N*N-1)
+                    startPtIdx = random.randint(0,Npts-1)
                 else:
                     startPtIdx = i
                 self.Tcost = 0.0
@@ -1256,7 +1260,7 @@ class path2D:
         self.idxpath = [startptidx]  # list if index points
         self.path = [] # list of trajectories
         self.Tcost = 0.0 # total path cost
-        self.mark = [True for x in range(N*N)]
+        self.mark = [True for x in range(Npts)]
         self.mark[startptidx] = False  # our first pt must be marked
         if costtype not in ['time','energy']:
             error('unknown cost type: '+costtype)
@@ -1264,14 +1268,14 @@ class path2D:
         #   build the path by greedy algorithm
         #
         print('   >>> New hsearch')
-        while len(self.path) < N*N-1: # build path up one pt at a time
+        while len(self.path) < Npts-1: # build path up one pt at a time
             # these store all unvisited,valid  branches out of this point/node
             edge_next_tr = []   # trajectory to the next pt
             edge_costs = []  # cost of branch/traj to the next point
             #
             # look at cost of all unmarked,valid branches out of this node
             #
-            for ccol in range(N*N):  # ccol is an index
+            for ccol in range(Npts):  # ccol is an index
                 if self.mark[ccol]:  # only unvisited
                     # look at all unvisited branches leaving current pt
                     br_traj = self.Cm.m[crow][ccol] #branch trajectory from this node
@@ -1423,8 +1427,8 @@ class path2D:
         arrow_directions = np.diff(arrow_positions, axis=0)
 
         # Plot arrows on the path at regular intervals
-        arrow_interval = len(self.path) // (N*N-1) # Change 5 to adjust the arrow density
-        #print('arrow_interval: {:}  len(self.path) {:}  N*N {:}'.format(arrow_interval, len(self.path), N*N))
+        arrow_interval = len(self.path) // (Npts-1) # Change 5 to adjust the arrow density
+        #print('arrow_interval: {:}  len(self.path) {:}  Npts {:}'.format(arrow_interval, len(self.path), Npts))
         arrow_positions = arrow_positions[:-1:arrow_interval]
         arrow_directions = arrow_directions[::arrow_interval]
 

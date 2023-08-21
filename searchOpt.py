@@ -109,7 +109,7 @@ def main(args):
     #
     #   Choose search size
     #
-    #nsearch = int(np.math.factorial(N*N) * 0.10)  # 10% of 3x3
+    #nsearch = int(np.math.factorial(Npts) * 0.10)  # 10% of 3x3
     #nsearch = 1000000  # 1M
     nsearch = 4
     #
@@ -149,7 +149,7 @@ def main(args):
             codeFolder = ''
             df.set_folders(pointsDataFolder,codeFolder) # also creates filename
             c1.fill(gt)  # randomize and compute traj's and costs
-            df.metadata.d['grid info'] = f'{N}x{N} random grid, {N*N} pts.'
+            df.metadata.d['grid info'] = f'{N}x{N} random grid, {Npts} pts.'
             gt.savePoints2D(df) #this will set the 'Research Question' to "RandomGridPointSet"
             print(f'Random pts saved to {df.name}')
             notes = f'generated random points file: {df.hashcode} {cto.N}x{cto.N}'
@@ -183,10 +183,10 @@ def main(args):
             # is it a valid path?
             #p.check()
             if gridtype=='random':
-                notes = f"Search Result: Rand-grid({pointSourceHash}), {SEARCHT}, cost: {cmin:.1f} ({cto.costtype})"
+                notes = f"Search Result: 2D Rand-grid({pointSourceHash}), {SEARCHT}, cost: {cmin:.1f} ({cto.costtype})"
                 print(f'\n\n               your search results file hash is: {dfw.hashcode} using grid {pointSourceHash}.')
             else:
-                notes = f"Search Result: {gridtype} grid, {SEARCHT}, cost: {cmin:.1f} ({cto.costtype})"
+                notes = f"Search Result: 2D {gridtype} grid, {SEARCHT}, cost: {cmin:.1f} ({cto.costtype})"
                 print(f'\n\n               your search results file hash is: {dfw.hashcode}.')
             print(f"RQ2: {dfw.metadata.d['Research Question']}")
             #  keep a "log book"
@@ -199,29 +199,27 @@ def main(args):
     #
     if SPACE == '6D':
 
-        #
-        # create grid
-        gt = cto.grid6D(cto.N)
-        # create cost matrix
-        c1 = cto.Cm6D()
-        if gridtype == 'random':
-            gt.randgrid = True
-            c1.set_GridRandomize()  # select random instead of grid
-
         if OP_MODE == 'generate':
+            cto.pts = cto.setupPoints6D()   # just store points instead of cost matrix Cm
             if gridtype != 'random':
                 cto.error('Somethings wrong with search config: 6D generate not random')
             df = bd.datafile(f'6DrandomGrid{N}x{N}PointSet','BH','simulation')
-            df.metadata.d['Random Grid'] = True
+            df.metadata.d['Computer Name'] = cto.PCNAME
+            if gridtype == 'random':
+                df.metadata.d['Random Grid'] = True
+            else:
+                df.metadata.d['Random Grid'] = False
             codeFolder = ''
             df.set_folders(pointsDataFolder,codeFolder) # also creates filename
-            c1.fill(gt)  # randomize and compute traj's and costs
-            df.metadata.d['grid info'] = f'{N}x{N} random grid, {N*N} pts.'
-            gt.savePoints6D(df) #this will set the 'Research Question' to "RandomGridPointSet"
+            df.metadata.d['grid info'] = f'{N}x{N}...x{N} random grid, {Npts} pts.'
+            #  generate the random points
+            cto.pts = cto.setupPoints6D() # store points instead of cost matrix Cm
+            cto.savePoints6D(df) #this will set the 'Research Question' to "RandomGridPointSet"
             print(f'Random pts saved to {df.name}')
             notes = f'generated random points file: {df.hashcode} {cto.N}x{cto.N}'
             logentry(df,notes)
-            print(f'\n\n               your points data file hash is:',df.hashcode)
+            print(f'{df.name}')
+            print(f'\n\n               your 6D points data file hash is:',df.hashcode)
 
 
         elif OP_MODE == 'search': # search mode with rect grid or read-in points
@@ -233,32 +231,32 @@ def main(args):
                 pointSourceHash = gt.readPoints2D(dfr)  #read in the set of random points
             # not for 6D: c1.fill(gt) # calc  costs after points reading
             dfw = bd.datafile('6Dsearching','BH','simulation')
+            dfw.metadata.d['Computer Name'] = cto.PCNAME
+            if gridtype == 'random':
+                dfw.metadata.d['Random Grid'] = True
+            else:
+                dfw.metadata.d['Random Grid'] = False
             dfw.set_folders(DataFolder,'')
-            cto.pts = cto.setupPoints6D()   # just store points instead of cost matrix Cm
             if gridtype=='random':
                 dfw.metadata.d['Points Data Source'] = pointsHash
             else:
                 dfw.metadata.d['Points Data Source'] = 'Regular Grid'
             q = input('Research Question for this 6D search: ')
             dfw.metadata.d['Research Question'] = q
-            if gridtype == 'random':
-                dfw.metadata.d['Random Grid'] = True
-            else:
-                dfw.metadata.d['Random Grid'] = False
             # instantiate a path:
             p = cto.path3D()
             # search will close the datafile
             path2, cmin = p.search(SEARCHT, dfile=dfw, nsamples=nsearch)
-
+            # search will close the datafile
             print('Optimal path returned: (tra)', path2.path)
             print('Optimal path returned: (idx)', path2.idxpath)
             # is it a valid path?
             #p.check()
             if gridtype=='random':
-                notes = f"Search Result: Rand-grid({pointSourceHash}), {SEARCHT}, cost: {cmin:.1f} ({cto.costtype})"
+                notes = f"Search Result: 6D Rand-grid({pointSourceHash}), {SEARCHT}, cost: {cmin:.1f} ({cto.costtype})"
                 print(f'\n\n               your search results file hash is: {dfw.hashcode} using grid {pointSourceHash}.')
             else:
-                notes = f"Search Result: {gridtype} grid, {SEARCHT}, cost: {cmin:.1f} ({cto.costtype})"
+                notes = f"Search Result: 6D {gridtype} grid, {SEARCHT}, cost: {cmin:.1f} ({cto.costtype})"
                 print(f'\n\n               your search results file hash is: {dfw.hashcode}.')
             print(f"RQ2: {dfw.metadata.d['Research Question']}")
             #  keep a "log book"
@@ -271,8 +269,7 @@ def logentry(df,notes):
     logfilename = 'work_logbook.txt'
     q = df.metadata.d['Research Question']
     if len(q)>0 and 'debug' not in q:  # skip junk files
-        now = dt.datetime.now()
-        dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
+        dtstring = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         logline = '{:}, {:}, {:},  RQ: {:}'.format(dtstring,df.hashcode, notes, q)
         with open(logdir+logfilename,'a') as f:
             print(logline,file=f)
