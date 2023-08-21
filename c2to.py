@@ -215,6 +215,33 @@ def savePoints6D(df):   # save points generated into a file
         df.write(row)
     df.close()
 
+def readPoints6D(df):  # read randomized points from a file
+    global pts
+    df.open('r')
+    pts = []  # place for the data
+    # read in a point for each entry store in pts global
+    ptindex = 0
+    for row in df.reader:
+        siv = row[0:6]
+        sxv = row[6:]
+        if len(siv) != 6 or len(sxv) != 6:
+            error('something wrong line 226')
+        iv = []
+        xv = []
+        for s in siv:   # convert from strings returned by reader
+            iv.append(int(s))
+        for s in sxv:
+            xv.append(float(s))
+        if ptindex != getidx6D(iv):
+            print(' ... somethings wrong line 235')
+        p1 = point3D(iv)
+        print(f"I'm creating 6D point at {iv}")
+        pts.append(p1)
+        ptindex += 1
+    df.close()
+    # return the file name from which the pts were read for the record
+    return df.hashcode
+
 def predict_timing(df, searchtype, systemName, nsamp):
     #
     # predict the search timing
@@ -531,6 +558,8 @@ class trajectory2D:
 
 
 class trajectory3D:
+    global Cm
+
     def __init__(self,p1,p2):
         #print('trajectory3D: p1,p2: ',p1,p2)
         self.p1 = p1
@@ -545,6 +574,7 @@ class trajectory3D:
         self.e_cost = None
         self.t_cost = None
 
+    #3D
     def compute(self,dt):
         p1 = self.p1
         p2 = self.p2
@@ -565,6 +595,7 @@ class trajectory3D:
             self.a2[i] = (dx - p1.xvect[i+3]*b0 - self.a3[i]*b2)/b1
         self.computed = True
 
+    #3D
     def x(self,t):
         rv = [0,0,0]
         for i in range(3):
@@ -581,7 +612,7 @@ class trajectory3D:
             rv[i] =       2.0*self.a2[i]    + 6.0*self.a3[i]*t
         return rv
 
-
+    #3D
     def get_Amax(self,dt):
         if not self.computed:
             error('cant get_Amax() unless tr.computed is True')
@@ -634,6 +665,7 @@ class trajectory3D:
         self.compute(self.dt) # because we changed dt
         return dt
 
+    #3D
     def timeEvolution(self,ACC_ONLY = False):  #3D & 6D
         if not self.computed and not self.constrained:
             error('Cant compute 3D timeEvolution until trajectory is computed and constrained')
@@ -667,8 +699,8 @@ class trajectory3D:
             return a
         else:
             return t,x,v,a
-
-    def getCosts(self):
+    #3D
+    def getCosts(self,Cm):
         idx1 = getidx6D(self.p1.ivect)
         idx2 = getidx6D(self.p2.ivect)
         if Cm.m[idx1][idx2] != 0: # if we've already computed
@@ -706,7 +738,7 @@ class trajectory3D:
         return str(self.p1) + ' ---> ' + str(self.p2)
 
 
-class Cm: # matrix full of trajectory2D objs
+class Cm2D: # matrix full of trajectory2D objs
     def __init__(self,df=None):
         self.m = [[ 0 for x in range(Npts)] for y in range(Npts)]
         # normally the points are in a regular 6 dim grid.  if Randgrid
@@ -714,13 +746,13 @@ class Cm: # matrix full of trajectory2D objs
         self.randgrid = False
         if df is not None:
             df.metadata.d['Random Grid'] = False
-
+    #2D
     def set_GridRandomize(self,df=None):
         self.randgrid = True
         if df is not None:
             df.metadata.d['Random Grid'] = True
         return
-
+    #2D
     def fill(self, grid):
         nselftr = 0
         print('starting fill...{:}x{:}'.format(N,N))
@@ -760,7 +792,7 @@ class Cm: # matrix full of trajectory2D objs
                 self.m[i1][j1] = t   # store the trajectory
 
 
-def cost_idxp6D(typestr, idxpath):   # compute total cost from a list of indices
+def cost_idxp6D(typestr, idxpath, Cm):   # compute total cost from a list of indices
     L = len(idxpath)-1
     if L != Npts-1:
         error('not a correct length path!: '+str(L))
@@ -772,7 +804,7 @@ def cost_idxp6D(typestr, idxpath):   # compute total cost from a list of indices
             error('path repeats a node index')
         #ct,ce = Cm.m[i1][i2]
         tr = trajectory3D(pts[i1],pts[i2])
-        tr.getCosts()
+        tr.getCosts(Cm)
         ce = tr.e_cost
         ct = tr.t_cost
         if typestr == 'energy':
@@ -796,13 +828,14 @@ class Cm6D:  # save memory, Cm.m only contains cost pair ct,ce
         if df is not None:
             df.metadata.d['Random Grid'] = False
 
-
+    #6D
     def set_GridRandomize(self,df=None):
         self.randgrid = True
         if df is not None:
             df.metadata.d['Random Grid'] = True
         return
 
+    #6D
     def fill(self):
         print('starting fill...')
         error('not using fill anymore')
@@ -837,7 +870,7 @@ class Cm6D:  # save memory, Cm.m only contains cost pair ct,ce
                     #
                     #   save the cost in Cm (old: full trajectory in Cm
                     ##       was big mem hog.)
-                    t.getCosts(self)
+                    t.getCosts(self) # since we are already in class Cm!
                     #t.constrain_A()
                     #a = t.timeEvolution(ACC_ONLY=True)
                     #ce = t.cost_e(a)
@@ -913,6 +946,7 @@ class path2D:
         self.maxTiesHSearch = -99999999  # most ties when greedy searching
         self.tie_freq = np.zeros(MAXTIEHISTO)  # histogram of how many ties of
 
+    #2D
     def search(self,searchtype,dfile=None,nsamples=1000):
         self.searchtype = searchtype
         print(f'testing: {searchtype}, {dfile.name}, {nsamples}')
@@ -962,9 +996,11 @@ class path2D:
         print('                                       tcost: ',c)
         return c
 
+    #2D
     def sampleSearch(self,dfile=None,nsamples=977):
         return self.bruteForce(dfile=dfile,sampling=True,nsamples=nsamples)
 
+    #2D
     def bruteForce(self,dfile=None,sampling=False,nsamples=0): # path class
         if self.searchtype.startswith('none'):
             self.searchtype = 'exhaustive'
@@ -1127,6 +1163,7 @@ class path2D:
         #return path object, float
         return pmin, pmin.Tcost
 
+    #2D
     def multiHSearch(self,dfile,nsearch):
         ts1 = datetime.datetime.now()
         self.datafile = dfile #keep track of this for adding metadata
@@ -1485,7 +1522,7 @@ class search_from_here6D:
         self.mark = Mark  # array to mark already chosen pts (True == still available)
         self.path = path
 
-    def iterate(self,N,function):
+    def iterate(self,N,function,Cm):
         for ix in range(N):
                 for iy in range(N):
                     for iz in range(N):
@@ -1494,14 +1531,14 @@ class search_from_here6D:
                                 for idz in range(N):
                                     ivect = [ix,iy,iz,idx,idy,idz]
                                     index = getidx6D(ivect)
-                                    function(index,ivect)
-
-    def find_cmin(self,p2idx,ivect):  # should be called by iterate as first step.
+                                    function(index,ivect,Cm)
+    #6D
+    def find_cmin(self,p2idx,ivect,Cm):  # should be called by iterate as first step.
         if self.mark[p2idx]: # index = Cm.m column
             self.IsawOne = True
             p1idx = self.pstartIdx
             if p1idx != p2idx:
-                tc = self.eval_cost(p1idx,p2idx)
+                tc = self.eval_cost(p1idx,p2idx,Cm)
                 #print('         find_cmin: ', tc, self.cmin)
                 ##x = input('  ... pause (CR) ...')
                 if tc < self.cmin:
@@ -1509,13 +1546,15 @@ class search_from_here6D:
                     self.minidx = p2idx
                     self.cminFound = True
 
-    def eval_cost(self,i1,i2):
+    #6D
+    def eval_cost(self,i1,i2,Cm):
+        # i1,i2 are indices of traj start and end pt.
         #try:
         #tc,ec = self.path.Cm.m[i1][i2]
         p1 = pts[i1]
         p2 = pts[i2]
         tr = trajectory3D(p1,p2)
-        tc,te = tr.getCosts()
+        tc,te = tr.getCosts(Cm)
         #except Exception as ex:
             #print('Exception in eval_cost:', type(ex).__name__, ex.args)
             #print('bad path indeces? ',i1,i2)
@@ -1553,23 +1592,22 @@ class search_from_here6D:
         self.mark[ti] = False  # mark new point as visited
         return ti,tr #chosen next traj index, chosen next traj trajectory
 
-    def find_all_cminTrs(self,index,v): # find a list of all next pts for which cost ~= cmin
+    def find_all_cminTrs(self,index,vect): # find a list of all next pts for which cost ~= cmin
         epsilon = self.cmin * 0.02 # define 'close'
         if self.mark[index]:
             tc = self.eval_cost(self.pstartIdx,index)  # get cost for this branch
-            #tr = trajectory3D(point3D(getcoord6D(self.pstartIdx)),point3D(getcoord6D(index)))
-            tr = trajectory3D(pts[self.pstartIdx],pts[index])
             if abs(tc-self.cmin) < epsilon:
+                tr = trajectory3D(pts[self.pstartIdx],pts[index])
                 self.minTrs.append(tr)
                 self.minidxs.append(index)
-        if len(self.minTrs) > self.path.nmin_max:
+        if len(self.minTrs) > self.path.nmin_max: # find the longest list length
             self.path.nmin_max = len(self.minTrs)
         self.ties = len(self.minidxs) #how many ties at this node??
 
 class path3D:
     #def __init__(self,Cm):
     def __init__(self):
-        #self.Cm = Cm      # cost matrix (actually trajectories)
+        self.Cm = None     # cost matrix (actually trajectories)
         ##sizer('path3D.Cm: ',self.Cm)
         self.sr = startrow
         self.sc = startcol
@@ -1633,7 +1671,8 @@ class path3D:
 
     #6D
     def sampleSearch(self,dfile=None,nsamples=977,profiler=None):
-        self.bruteForce(dfile=dfile,sampling=True,nsamples=nsamples,profiler=profiler)
+        path, cost = self.bruteForce(dfile=dfile,sampling=True,nsamples=nsamples,profiler=profiler)
+        return path, cost
 
     #6D
     def bruteForce(self,dfile=None,sampling=False,nsamples=0,profiler=None): # path class
@@ -1683,7 +1722,7 @@ class path3D:
         #  Only sampling - full brute force is deleted
         #
         # 1) generate list of paths
-        print('We are generating {:} random paths through {:} nodes'.format(nsamples,Npts))
+        print('We are generating {:} random sampled paths through {:} nodes'.format(nsamples,Npts))
         phset = set()
         piter = []
         n = 0
@@ -1704,6 +1743,7 @@ class path3D:
 
         #2) evaluate their costs
 
+        self.Cm = Cm6D()   # this will store costs for each Tr  as they are encountered
         path_costs = []
         n = -1
         cmin = 99999999999
@@ -1716,10 +1756,10 @@ class path3D:
             # p is the current path [idx0,idx1,idx2 ...]
             # now get the cost of p
             idxpath = list(p)
-            c = cost_idxp6D(costtype, idxpath)  #what is cost of this path?
+            c = cost_idxp6D(costtype, idxpath,self.Cm)  #what is cost of this path?
             if n%updaterate == 0:
-                pct = int(100.0*n/nsamples)
-                print(f'{pct:.1}%') # I'm alive!
+                pct = 100.0*n/nsamples
+                print(f'{pct:4}%') # I'm alive!
             if STOREDATA:
                 row = idxpath # list of int index pts
                 row.append(c) # tack on the cost
@@ -1931,7 +1971,7 @@ class path3D:
                 print(f'      exit condition: {len(self.path)},{Npts}-> {len(self.path) >= Npts}')
             if len(self.path) >= Npts:
                 break
-            self.Tcost = cost_idxp6D(costtype, self.idxpath)  # compute total cost of the path
+            self.Tcost = cost_idxp6D(costtype, self.idxpath,self.Cm)  # compute total cost of the path
             print('heuristic path search completed!')
             print('{:} Total path cost ({:}) = {:8.2f}: '.format(self.searchtype,costtype,self.Tcost))
             # return path object, float
@@ -2042,7 +2082,7 @@ def main():
 
     print('\n\n   Cm tests: ')
 
-    c1 = Cm()
+    c1 = Cm2D()
 
     SKIPFILL = False  # save time to focus on later tests
 

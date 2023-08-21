@@ -111,7 +111,7 @@ def main(args):
     #
     #nsearch = int(np.math.factorial(Npts) * 0.10)  # 10% of 3x3
     #nsearch = 1000000  # 1M
-    nsearch = 4
+    nsearch = 2000
     #
     #   Choose cost type
     #
@@ -137,7 +137,7 @@ def main(args):
         # create grid
         gt = cto.grid2D(cto.N)
         # create cost matrix
-        c1 = cto.Cm()
+        c1 = cto.Cm2D()
         if gridtype == 'random':
             gt.randgrid = True
             c1.set_GridRandomize()  # select random instead of grid
@@ -228,7 +228,7 @@ def main(args):
                 dfr = bd.datafile('','','') #'' ok for reading
                 dfr.set_folders('','') # '' ok for reading
                 dfr.name = pointsFilename
-                pointSourceHash = gt.readPoints2D(dfr)  #read in the set of random points
+                pointSourceHash = cto.readPoints6D(dfr)  #read in the set of random points
             # not for 6D: c1.fill(gt) # calc  costs after points reading
             dfw = bd.datafile('6Dsearching','BH','simulation')
             dfw.metadata.d['Computer Name'] = cto.PCNAME
@@ -262,7 +262,7 @@ def main(args):
             #  keep a "log book"
             logentry(dfw,notes)
             # graph the optimal search result (best path)
-            path2.plot(-1,notes)
+            #path2.plot(-1,notes)  # tougher for 6D
 
 def logentry(df,notes):
     logdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
