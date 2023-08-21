@@ -78,12 +78,15 @@ def main(args):
         pointsDataName   = fns[0][1]
         pointsFilename = pointsDataFolder + '/'+pointsDataName  # full path of points file
 
+
+
+    ##########################################################################
     ##########################################################################
     #
     #    Configure the job
     #
-    SPACE = '2D'
-    #SPACE = '6D'
+    #SPACE = '2D'
+    SPACE = '6D'
     if SPACE not in ['2D', '6D']:
         cto.error(' must select space from 2D or 6D')
 
@@ -94,27 +97,21 @@ def main(args):
         Npts = N*N
     else:
         Npts = N**6
-
     cto.M = Npts
     cto.Npts = Npts
-
     #
     #   Choose search type
     #
     ##SEARCHT = 'heuristic search' # greedy nearest neighbor (working??)
-    SEARCHT = 'exhaustive'   # enumerate all paths (formerly 'brute force') (2D only!)
-    #SEARCHT = 'sampling search' # nsearch random paths
+    #SEARCHT = 'exhaustive'   # enumerate all paths (formerly 'brute force') (2D only!)
+    SEARCHT = 'sampling search' # nsearch random paths
     #SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
-
-    #searchType = SEARCHT  # still need this???
-
     #
     #   Choose search size
     #
-    nsearch = int(np.math.factorial(N*N) * 0.10)  # 10% of 3x3
+    #nsearch = int(np.math.factorial(N*N) * 0.10)  # 10% of 3x3
     #nsearch = 1000000  # 1M
     nsearch = 4
-
     #
     #   Choose cost type
     #
@@ -123,14 +120,15 @@ def main(args):
     cto.NPC = 30   #  # of simulation points in 0-dt time interval
     #
     ##########################################################################
+    ##########################################################################
+
+
 
     if SPACE=='6D' and SEARCHT == 'exhaustive':
         cto.error(' Not possible to do exhaustive search with 6D (dude, get a quantum computer!)')
     ###########################################################
     #
     #    Now get to work...   #
-    #
-
     #
     #   2D version
     #

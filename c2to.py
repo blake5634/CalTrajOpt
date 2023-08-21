@@ -12,8 +12,6 @@ import random
 import socket
 import time
 
-
-
 def error(msg):
     print('Error: ')
     print(msg)
@@ -105,62 +103,6 @@ def idx2rc(idx):
     # same as above
     return idx2ij(idx)
 
-#def predict_timing(df, searchtype, nsamp):
-    ##
-    ## predict the search timing
-    ##
-    #savedir = ''
-    #if df is not None:
-        #savedir = df.folder
-    #filename = savedir + 'searchTiming.json'
-    #OK = True
-    #key = searchtype + '-' + PCNAME
-    #if os.path.isfile(filename):
-        #fd = open(filename,'r')
-        #d = json.load(fd)
-        #try:
-            #t = d[key]
-        #except:
-            #OK=False
-        #if OK:
-            #print('your predicted search time is:')
-            #print('search type/PC:',key)
-            #print('rate:          ',d[key],'/sec')
-            #sec = float(d[key])*nsamp
-            #mins = sec/60
-            #hrs = mins/60
-            #days = hrs/24
-            #years = days/365
-            #print('predicted time: ')
-            #fmth='{:30} {:>12} {:>12} {:>12} {:>12}'
-            #print(fmth.format('PC type','mins','hrs','days','years'))
-            #fmts='{:30} {:12.2f} {:12.2f} {:12.2f} {:12.2f}'
-            #print(fmts.format(key, mins,hrs,days,years))
-            #if mins>2:
-                #x=input('OK to continue? ...')
-    #else:
-        #OK=False #path is not a file
-    #if not OK:
-        #print('no search speed info available for your configuration: ',key)
-        #x=input('OK to continue? ...')
-
-#def save_timing(df, searchname,systemName,rate):
-    #savedir = ''
-    #if df is not None:
-        #savedir = df.folder
-    #filename = savedir + 'searchTiming.json'
-    #if os.path.isfile(filename):
-        #fd = open(filename,'r')
-        #d = json.load(fd)
-    #else:
-        #d = {}
-    ## add to the dict and resave
-    #d[searchname+'-'+systemName] = rate
-    #fd = open(filename,'w')
-    #json.dump(d,fd,indent=4)
-    #return
-
-
 def plotSave(fig, dpi, imagedir, imagename):
     #fig = plt.gcf()
     #datad = string path to data directory
@@ -216,7 +158,29 @@ class grid2D:
         # return the file name from which the pts were read for the record
         return df.hashcode
 
-#  convert between 6D int coordiates and point index
+***************************  class  grid6d()???
+
+    def savePoints6D(self,df):   # save points generated into a file
+        if not self.randgrid:
+            error('savePoints2D: Do not save points if they are not random')
+        # each entry in Cm is a trajectory2D  we need only store p1 and p2
+        it =str(type(5))
+        ft =str(type(3.14159))
+        df.metadata.d['Types'] = [it,it,ft,ft]
+        df.metadata.d['Names'] = ['i1','j1','x1','v1']
+        df.metadata.d['Ncols'] = len(df.metadata.d['Names'])
+        df.descript_str = 'randomGridPointSet' # standardize for point storage filename fields
+        df.metadata.d['Research Question'] = 'RandomGridPointSet' # standardize for RQ
+        df.open('w')
+        # write out key info for each point.
+        for i in range(N):
+            for j in range(N):
+                p1 = self.gr[i][j]
+                row = [i,j, p1.x, p1.v ]
+                df.write(row)
+        df.close()
+
+#  convert between 6D int coordinates and point index
 def getidx6D(v):
     return v[0]*N**5+v[1]*N**4+v[2]*N**3+v[3]*N**2+v[4]*N+v[5]
 
@@ -1602,11 +1566,11 @@ class path3D:
     #def __init__(self,Cm):
     def __init__(self):
         #self.Cm = Cm      # cost matrix (actually trajectories)
-        #sizer('path3D.Cm: ',self.Cm)
+        ##sizer('path3D.Cm: ',self.Cm)
         self.sr = startrow
         self.sc = startcol
         self.mark = [True for x in range(Npts)]  # true if pt is UNvisited
-        sizer('path3D.mark: ',self.mark)
+        ##sizer('path3D.mark: ',self.mark)
         self.mark[self.sr*N+self.sc] = False # mark our starting point (can be overridden)
         self.Tcost = 0.0
         self.path = []  # the path as a list of trajectories
@@ -1642,11 +1606,12 @@ class path3D:
         #  a full brute force search over all paths
         #
         elif searchtype.startswith('brute'):
-            if dfile is None:
-                error('path.search: brute force search requires a dfile')
-            p, cmin = self.bruteForce(dfile=dfile,profiler=profiler)
+            error('6D grid is to huge for brute force search!')
+            #if dfile is None:
+                #error('path.search: brute force search requires a dfile')
+            #p, cmin = self.bruteForce(dfile=dfile,profiler=profiler)
         #
-        # a random sample of paths are cost-evaluated
+        # cost-evaluate a random sample of paths
         #
         elif searchtype.startswith('sampling'):
             if dfile is None:
@@ -1662,11 +1627,11 @@ class path3D:
         save_timing(dfile,searchtype,PCNAME,float(dt)/nsamples)
         return p,cmin
 
+    #6D
     def sampleSearch(self,dfile=None,nsamples=977,profiler=None):
-        print('Testing: sampling search, nsam:',nsamples)
-        return self.bruteForce(dfile=dfile,sampling=True,nsamples=nsamples,profiler=profiler)
+        self.bruteForce(dfile=dfile,sampling=True,nsamples=nsamples,profiler=profiler)
 
-
+    #6D
     def bruteForce(self,dfile=None,sampling=False,nsamples=0,profiler=None): # path class
         if self.searchtype.startswith('none'):
             self.searchtype = 'brute force'
@@ -1710,14 +1675,10 @@ class path3D:
             #
             df.open()  # let's open the file (default is for writing)
 
-        ##1) list all possible paths
-
         #
         #  Only sampling - full brute force is deleted
         #
-        if not sampling:
-            error(' we already checked this !!!')
-
+        # 1) generate list of paths
         print('We are generating {:} random paths through {:} nodes'.format(nsamples,Npts))
         phset = set()
         piter = []
@@ -1734,25 +1695,17 @@ class path3D:
                 phset.add(ph)
                 piter.append(p)
                 n+=1 # count adds (faster than len()??)
-
-        sizer('piter: ',piter)
-
+        #sizer('piter: ',piter)
         print('Path enumeration complete (without duplicates):')
 
-        # keep around for history
-        #secPerLoop = 0.0003366 # measured on IntelNUC
-        #secPerLoop = 0.0008419 # Dell XPS-13
-
         #2) evaluate their costs
+
         path_costs = []
         n = -1
         cmin = 99999999999
         cmax = 0
         pmax = path3D()
-        sizer('pmax1: ',pmax)
         pmin = path3D()
-        sizer('pmax2: ',pmax)
-        sizer('pmin: ',pmin)
         updaterate = nsamples//20
         for p in piter:  # piter iterates to a series of lists of point indices
             n+=1
@@ -1765,7 +1718,7 @@ class path3D:
                 print(f'{pct:.1}%') # I'm alive!
             if STOREDATA:
                 row = idxpath # list of int index pts
-                row.append(c)
+                row.append(c) # tack on the cost
                 df.write(row)
             if c > cmax:
                 cmax = c
@@ -1784,7 +1737,7 @@ class path3D:
                 path_costs.append(c)
             if nsamples < 100:  # too much clutter for big searches
                 print('{:} path cost: {:12.2f}'.format(n,c))
-                sizer('pmin: ',pmin)
+                #sizer('pmin: ',pmin)
         #
         #  we are done with the path set to be evaluated
         #
@@ -1802,7 +1755,7 @@ class path3D:
         #return path object, float
         return pmin, pmin.Tcost     # end of bruteforce
 
-
+    #6D
     def multiHSearch(self,dfile,nsearch,profiler=None):
         ts1 = datetime.datetime.now()
         self.datafile = dfile #keep track of this for adding metadata
@@ -1868,7 +1821,6 @@ class path3D:
                 #
                 datarow = pself.idxpath  # ********
                 #
-                #print('my path: ',datarow)
                 datarow.append(c) # last col is cost
                 df.write(datarow)
                 if c < cmin: # find lowest cost of the runs
@@ -1896,13 +1848,7 @@ class path3D:
                 destfolder.append('/')
             tfname = destfolder+'ties_info_'+ df.hashcode+'.csv'
             fp = open (tfname, 'w')
-            #print('Distribution of tie choices: (',len(self.path),' points in path)',file=fp)
-            #print('\n  tie rank    |  how many times',file=fp)
-            #print('----------------------------------------',file=fp)
-            #sum = 0
-            #medianflag = True
             fmtstring1 = '{:8d} , {:8d}, {:8.4f}'
-            #fmtstring2 = '{:8d}     |     {:8d} << median'
             median=0
             for i,n in enumerate(self.tie_freq):
                 median += n
@@ -1921,6 +1867,7 @@ class path3D:
         # return path object, float
         return pmin,pmin.Tcost
 
+    # 6D
     def heuristicSearch3D(self, idx1, profiler=None):
         # sanity check!!
         if Npts > 1.0E4:
@@ -1930,8 +1877,6 @@ class path3D:
         self.mark = [True for x in range(Npts)]
         count = 0
         self.mark[idx1] = False # mark our starting point
-
-
         self.Tcost = 0.0
         self.path = [pts[startPtIdx]]
         self.idxpath = [startPtIdx] # path has a start point
@@ -1982,40 +1927,12 @@ class path3D:
                 print(f'      exit condition: {len(self.path)},{Npts}-> {len(self.path) >= Npts}')
             if len(self.path) >= Npts:
                 break
-
             self.Tcost = cost_idxp6D(costtype, self.idxpath)  # compute total cost of the path
-
-            REPORTHISTO = False
-            #if REPORTHISTO:
-                #print('Distribution of tie choices: (',len(self.path),' points in path)')
-                #print('\n  tie rank    |  how many times')
-                #print('----------------------------------------')
-                #sum = 0
-                #medianflag = True
-                #fmtstring1 = '{:8d}     |     {:8d} '
-                #fmtstring2 = '{:8d}     |     {:8d} << median'
-                #median=0
-                #for i,n in enumerate(self.tie_freq):
-                    #median += n
-                #median /=2
-
-                #for i,n in enumerate(self.tie_freq):
-                    #sum += int(n)
-                    #if sum < median and medianflag :
-                        #fmt = fmtstring1
-                    #elif medianflag:
-                        #fmt = fmtstring2
-                        #medianflag = False
-                    #else:
-                        #fmt = fmtstring1
-                    #print(fmt.format(i,int(n)))
-                #print('')
-                #print('\n\n       The longest set of min-cost next points was: {:} points\n\n'.format(self.nmin_max))
             print('heuristic path search completed!')
             print('{:} Total path cost ({:}) = {:8.2f}: '.format(self.searchtype,costtype,self.Tcost))
             # return path object, float
             return self, self.Tcost
-
+    # 6D
     def check(self): # 3D
         if len(self.path) != Npts-1:
             error('wrong path length '+str(len(self.path)))
@@ -2027,7 +1944,7 @@ class path3D:
                 if self.path[i-1].p2 != t.p1:
                     error('discontinuous path: '+str(i-1)+' '+str(i))
             i+=1
-
+    #6D
     def compute_curves6D(self,idx): #3D
         curvepts_x = []
         for i,tr in enumerate(self.path):
@@ -2048,7 +1965,7 @@ class path3D:
         x = np.array(curvepts_x).T
         return x
 
-
+    #6D
     def save3D(self,fname): # save 3D trajectory for animation and plotting
         #
         #   this is a new datafile just for visualization
