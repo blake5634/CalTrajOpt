@@ -105,60 +105,60 @@ def idx2rc(idx):
     # same as above
     return idx2ij(idx)
 
-def predict_timing(df, searchtype, nsamp):
-    #
-    # predict the search timing
-    #
-    savedir = ''
-    if df is not None:
-        savedir = df.folder
-    filename = savedir + 'searchTiming.json'
-    OK = True
-    key = searchtype + '-' + PCNAME
-    if os.path.isfile(filename):
-        fd = open(filename,'r')
-        d = json.load(fd)
-        try:
-            t = d[key]
-        except:
-            OK=False
-        if OK:
-            print('your predicted search time is:')
-            print('search type/PC:',key)
-            print('rate:          ',d[key],'/sec')
-            sec = float(d[key])*nsamp
-            mins = sec/60
-            hrs = mins/60
-            days = hrs/24
-            years = days/365
-            print('predicted time: ')
-            fmth='{:30} {:>12} {:>12} {:>12} {:>12}'
-            print(fmth.format('PC type','mins','hrs','days','years'))
-            fmts='{:30} {:12.2f} {:12.2f} {:12.2f} {:12.2f}'
-            print(fmts.format(key, mins,hrs,days,years))
-            if mins>2:
-                x=input('OK to continue? ...')
-    else:
-        OK=False #path is not a file
-    if not OK:
-        print('no search speed info available for your configuration: ',key)
-        x=input('OK to continue? ...')
+#def predict_timing(df, searchtype, nsamp):
+    ##
+    ## predict the search timing
+    ##
+    #savedir = ''
+    #if df is not None:
+        #savedir = df.folder
+    #filename = savedir + 'searchTiming.json'
+    #OK = True
+    #key = searchtype + '-' + PCNAME
+    #if os.path.isfile(filename):
+        #fd = open(filename,'r')
+        #d = json.load(fd)
+        #try:
+            #t = d[key]
+        #except:
+            #OK=False
+        #if OK:
+            #print('your predicted search time is:')
+            #print('search type/PC:',key)
+            #print('rate:          ',d[key],'/sec')
+            #sec = float(d[key])*nsamp
+            #mins = sec/60
+            #hrs = mins/60
+            #days = hrs/24
+            #years = days/365
+            #print('predicted time: ')
+            #fmth='{:30} {:>12} {:>12} {:>12} {:>12}'
+            #print(fmth.format('PC type','mins','hrs','days','years'))
+            #fmts='{:30} {:12.2f} {:12.2f} {:12.2f} {:12.2f}'
+            #print(fmts.format(key, mins,hrs,days,years))
+            #if mins>2:
+                #x=input('OK to continue? ...')
+    #else:
+        #OK=False #path is not a file
+    #if not OK:
+        #print('no search speed info available for your configuration: ',key)
+        #x=input('OK to continue? ...')
 
-def save_timing(df, searchname,systemName,rate):
-    savedir = ''
-    if df is not None:
-        savedir = df.folder
-    filename = savedir + 'searchTiming.json'
-    if os.path.isfile(filename):
-        fd = open(filename,'r')
-        d = json.load(fd)
-    else:
-        d = {}
-    # add to the dict and resave
-    d[searchname+'-'+systemName] = rate
-    fd = open(filename,'w')
-    json.dump(d,fd,indent=4)
-    return
+#def save_timing(df, searchname,systemName,rate):
+    #savedir = ''
+    #if df is not None:
+        #savedir = df.folder
+    #filename = savedir + 'searchTiming.json'
+    #if os.path.isfile(filename):
+        #fd = open(filename,'r')
+        #d = json.load(fd)
+    #else:
+        #d = {}
+    ## add to the dict and resave
+    #d[searchname+'-'+systemName] = rate
+    #fd = open(filename,'w')
+    #json.dump(d,fd,indent=4)
+    #return
 
 
 def plotSave(fig, dpi, imagedir, imagename):
@@ -435,6 +435,132 @@ class point2D:
             st += '{:3d}, '.format(s)
         st += ')'
         return st
+
+class trajectory2D:
+    def __init__(self,p1,p2):
+        #print('trajectory2D: p1,p2: ',p1,p2)
+        self.p1 = p1
+        self.p2 = p2
+        self.e_cost = None
+        self.t_cost = None
+        self.computed = False
+        self.constrained = False
+        self.valid = True
+
+    def compute(self,dt):
+        p1 = self.p1
+        p2 = self.p2
+        # p(0) = a0
+        self.a0 = p1.x
+        # v(0) = a1
+        self.a1 = p1.v
+        # p(dt) = a0 + self.a1*dt
+        #define some constants
+        dx = p2.x-p1.x
+        dv = p2.v-p1.v
+        b0 = dt
+        b1 = dt*dt
+        b2 = dt*dt*dt
+        b3 = 2.0*dt
+        b4 = 3.0*dt*dt
+        # a3 solution:
+        self.a3 = (dv - (b3/b1)*(dx-p1.v*b0))/(b4-b2*b3/b1)
+        self.a2 = (dx - p1.v*b0 - self.a3*b2)/b1
+        self.computed = True
+
+    def x(self,t):
+        return self.a0 + self.a1*t +    self.a2*t*t +     self.a3*t*t*t
+    def xd(self,t):
+        return           self.a1   + 2.0*self.a2*t  + 3.0*self.a3*t*t
+    def xdd(self,t):
+        return                       2.0*self.a2    + 6.0*self.a3*t
+
+    def get_Amax(self,dt):
+        return max(abs(self.xdd(0)),abs(self.xdd(dt)))
+
+    def constrain_A(self):
+        # hack for fixed dt
+        #dt = DT_TEST
+        #self.compute(dt)
+
+        #
+        # adaptive dt
+        #
+        dt = 0.2
+        ni = 0
+        while True:
+            ni += 1
+            self.compute(dt)
+            if self.get_Amax(dt) > AMAX:
+                dt *= 1.1
+            else:
+                break
+        dt *= 0.9
+        while True:
+            ni += 1
+            self.compute(dt)
+            if self.get_Amax(dt) > AMAX:
+                dt *= 1.02
+            else:
+                break
+        #print('Constrain_A: iterations: ', ni, ' dt = ', dt)
+        #print('             self.get_Amax(dt):',self.get_Amax(dt))
+        self.dt = dt
+        self.constrained = True
+        self.compute(self.dt) # because we changed dt
+        return dt
+
+    def timeEvolution(self,ACC_ONLY=False):
+        if not self.computed and not self.constrained:
+            error('Cant compute timeEvolution until trajectory is computed and constrained')
+        Np = 20
+        x = []
+        v = []
+        a = []
+        t = []
+        if not ACC_ONLY:
+            for t1 in range (Np):
+                t2 = self.dt*t1/Np
+                t.append(t2)
+                x.append(self.x(t2))
+                v.append(self.xd(t2))
+                a.append(self.xdd(t2))
+            # add last points to close
+            t.append(self.dt)
+            x.append(self.x(self.dt))
+            v.append(self.xd(self.dt))
+            a.append(self.xdd(self.dt))
+            return t,x,v,a
+        if ACC_ONLY:
+            for t1 in range (Np):
+                t2 = self.dt*t1/Np
+                a.append(self.xdd(t2))
+            a.append(self.xdd(self.dt))
+            return a
+
+    #   Energy cost: sum of squared acceleration
+    def cost_e(self,a):
+        #
+        # Note: there is an analytical expression for this:
+        #  \int_0^{\delta t} \ddot{x} = 4a_2(\delta t) + 12a_2a_3(\delta t)^2 + 12a_3^2(\delta t)^3
+        #    (derived 8/14/23)
+        #
+        if not self.computed and not self.constrained:
+            error('Cant compute cost_e until trajectory is computed and constrained')
+        c = 0.0
+        for a1 in a:
+            c += self.dt*a1*a1
+        self.e_cost = c/len(a)
+        return c
+
+    def cost_t(self):
+        if not self.computed and not self.constrained:
+            error('Cant compute cost_t until trajectory is computed and constrained')
+        self.t_cost = self.dt
+        return self.dt
+
+    def __repr__(self):
+        return str(self.p1) + ' ---> ' + str(self.p2)
 
 
 class trajectory3D:
@@ -809,10 +935,8 @@ class path2D:
     def __init__(self,grid,Cm):
         self.Cm = Cm      # cost matrix (actually trajectories)
         self.grid = grid
-        self.sr = startrow
-        self.sc = startcol
         self.mark = [True for x in range(N*N)]
-        self.mark[self.sr*N+self.sc] = False # mark our starting point
+        #self.mark[self.sr*N+self.sc] = False # mark our starting point
         self.Tcost = 0.0
         self.path = []  # the path as a list of trajectories
         self.idxpath = [] # the path as a list of indeces (0..N*N)
@@ -824,8 +948,8 @@ class path2D:
 
     def search(self,searchtype,dfile=None,nsamples=1000):
         self.searchtype = searchtype
-
-        predict_timing(dfile, searchtype, nsamples)
+        print(f'testing: {searchtype}, {dfile.name}, {nsamples}')
+        predict_timing(dfile, searchtype, PCNAME, nsamples)
         #
         #  start timer
         ts1 = datetime.datetime.now()
@@ -947,14 +1071,14 @@ class path2D:
         n = -1
         cmin = 99999999999
         cmax = 0
-        pmax = path(self.grid,self.Cm)   # storage for int results
-        pmin = path(self.grid, self.Cm)
+        pmax = path2D(self.grid,self.Cm)   # storage for int results
+        pmin = path2D(self.grid, self.Cm)
 
         itrct = -1
         for p in piter:  # piter returns a whole "list" of point indices each time
             itrct += 1
             idxpath = list(p)
-            p = path(self.grid, self.Cm) # temp variable
+            p = path2D(self.grid, self.Cm) # temp variable
             p.idxpath = idxpath # use own idxpath for tmp idx path storage(!)
             p.path = []  # use own path for tmp path storage(!)
             iterct = -1
@@ -1103,12 +1227,12 @@ class path2D:
                 df.write(datarow)
                 if c < cmin: # find lowest cost of the runs
                     cmin=c
-                    pmin = path(self.grid,self.Cm)
+                    pmin = path2D(self.grid,self.Cm)
                     pmin.path = pself.path
                     pmin.Tcost = c
                 if c > cmax: # find highest cost
                     cmax = c
-                    pmax = path(self.grid,self.Cm)
+                    pmax = path2D(self.grid,self.Cm)
                     pmax.path = self.path
                     pmax.Tcost = c
             if not MULTI_SEARCH_PER_PT:
@@ -1189,7 +1313,6 @@ class path2D:
                     # look at all unvisited branches leaving current pt
                     br_traj = self.Cm.m[crow][ccol] #branch trajectory from this node
                     #print('\ncrow,ccol:',crow,ccol)
-                    #br_traj.aprtr('pull tr from Cm')
                     if br_traj.valid: # don't do self transitions
                         if costtype == 'energy':
                             br_cost = br_traj.e_cost # now pre-computed
@@ -1275,6 +1398,64 @@ class path2D:
         self.T_cost = self.cost()  # compute and store traj cost
         #time.sleep(0.5)
         return self, self.T_cost
+
+    # plot grid and trajectories (2D only)
+
+    def plot(self,idx, note=''): # plot a path with trajectories
+        fig = self.plotSetup(note)
+        self.plotOnePath(fig)
+        self.plotDone(fig)
+
+    def plotSetup(self,note):
+        if self.datafile is not None:
+            hashcode = self.datafile.hashcode
+        else:
+            hashcode = ''
+        fig = plt.figure()
+        plt.title('{:}'.format(note))
+        plt.xlabel('X     ('+hashcode+')')
+        plt.ylabel('\dot{X}')
+        plt.grid(True)
+        return fig
+
+    def plotOnePath(self,fig):
+        # get endpoints for arrows
+        x_values = [traj.p1.x for traj in self.path]  # starting values
+        y_values = [traj.p1.v for traj in self.path]
+        x_values.append(self.path[-1].p2.x)
+        y_values.append(self.path[-1].p2.v)
+        print(f'plotOnePath: len(xvals): {len(x_values)}')
+        ax = plt.gca()
+        ax.plot(x_values, y_values, 'o')
+        arrow_positions = np.array([x_values, y_values]).T
+        arrow_directions = np.diff(arrow_positions, axis=0)
+
+        # Plot arrows on the path at regular intervals
+        arrow_interval = len(self.path) // (N*N-1) # Change 5 to adjust the arrow density
+        #print('arrow_interval: {:}  len(self.path) {:}  N*N {:}'.format(arrow_interval, len(self.path), N*N))
+        arrow_positions = arrow_positions[:-1:arrow_interval]
+        arrow_directions = arrow_directions[::arrow_interval]
+
+        tr = self.path[0]
+        startpt = plt.Circle((tr.p1.x,tr.p1.v),0.05,color='green')
+        ax.add_patch(startpt)
+
+    def plotDone(self,figure):
+        plt.show()
+        df = self.datafile
+        template = f'______________{df.hashcode}.png'
+        print('filename template: ',template)
+        nroot = input('enter name root: (<enter> to not save) ')
+        if len(nroot)>0:
+            nroot += '_' # separate the hash
+            imgdir = df.folder+'writing/'
+            imgname = nroot + df.hashcode
+            my_dpi = 200
+            plotSave(figure, my_dpi, imgdir, imgname)
+
+        else:
+            print('plot image NOT saved')
+
 
 class search_from_here6D:
     def __init__(self,Mark,path):
@@ -1694,9 +1875,6 @@ class path3D:
         return pmin,pmin.Tcost
 
     def heuristicSearch3D(self, idx1, profiler=None):
-        ADVANCED = True
-        BASIC = not ADVANCED  # we're just not going to do BASIC anymore
-
         # sanity check!!
         if Npts > 1.0E4:
             error('too big a search!!: '+float(Npts))
@@ -1707,57 +1885,57 @@ class path3D:
         self.mark[idx1] = False # mark our starting point
 
 
-        if ADVANCED:
-            self.Tcost = 0.0
-            self.path = [pts[startPtIdx]]
-            self.idxpath = [startPtIdx] # path has a start point
-            self.nmin_max = 0
-            latestIdx = startPtIdx
-            #while len(self.path) < (Npts):
-            updaterate = Npts//10
-            while True:
-                li = len(self.path)
-                if li%updaterate==0:
-                    pct = 1+int(100.0 * li / Npts)
-                    print(f' completion: {pct:2}%')
-                srchFrmHere = search_from_here6D(self.mark,self)
-                srchFrmHere.cmin = 99999999 # just being sure/clear
-                srchFrmHere.pstartIdx = latestIdx  # updated at end of this loop!
-                srchFrmHere.minTrs=[] #these will hold all branches matching cmin cost.
-                srchFrmHere.minidxs=[]
-                srchFrmHere.IsawOne = False
+        self.Tcost = 0.0
+        self.path = [pts[startPtIdx]]
+        self.idxpath = [startPtIdx] # path has a start point
+        self.nmin_max = 0
+        latestIdx = startPtIdx
+        #while len(self.path) < (Npts):
+        updaterate = Npts//10
+        while True:
+            li = len(self.path)
+            if li%updaterate==0:
+                pct = 1+int(100.0 * li / Npts)
+                print(f' completion: {pct:2}%')
+            srchFrmHere = search_from_here6D(self.mark,self)
+            srchFrmHere.cmin = 99999999 # just being sure/clear
+            srchFrmHere.pstartIdx = latestIdx  # updated at end of this loop!
+            srchFrmHere.minTrs=[] #these will hold all branches matching cmin cost.
+            srchFrmHere.minidxs=[]
+            srchFrmHere.IsawOne = False
 
-                ### iteration through the open branches from this node
-                srchFrmHere.iterate(N,srchFrmHere.find_cmin)
-                #gate = li > 725 or li < 4
-                gate = False
-                if gate:
-                    print(f'{li}: Started at: {latestIdx}: any?: {srchFrmHere.IsawOne}, minfound: {srchFrmHere.cminFound}, mincost: {srchFrmHere.cmin}')
-                if not srchFrmHere.cminFound:
-                    error('heuristic search iteration: somethings wrong, need to find_cmin before find_all')
-                srchFrmHere.iterate(N,srchFrmHere.find_all_cminTrs)
-                ###
+            ### iteration through the open branches from this node
+            srchFrmHere.iterate(N,srchFrmHere.find_cmin)
+            #gate = li > 725 or li < 4
+            gate = False
+            if gate:
+                print(f'{li}: Started at: {latestIdx}: any?: {srchFrmHere.IsawOne}, minfound: {srchFrmHere.cminFound}, mincost: {srchFrmHere.cmin}')
+            if not srchFrmHere.cminFound:
+                error('heuristic search iteration: somethings wrong, need to find_cmin before find_all')
+            srchFrmHere.iterate(N,srchFrmHere.find_all_cminTrs)
+            ###
 
-                # keep track of greatest number of ties along this path
-                if srchFrmHere.ties > self.maxTiesHSearch:
-                    self.maxTiesHSearch = srchFrmHere.ties
+            # keep track of greatest number of ties along this path
+            if srchFrmHere.ties > self.maxTiesHSearch:
+                self.maxTiesHSearch = srchFrmHere.ties
 
-                if gate:
-                    print(f'     Ties: {len(srchFrmHere.minidxs)}/{len(srchFrmHere.minTrs)}')
-                nxtidx,nxtTr = srchFrmHere.select_next()   # break a possible tie btwn branches leaving this pt.
-                if gate:
-                    print(f' ...   appending {nxtidx}')
-                    if nxtidx in self.idxpath:
-                        print(f'      {idxpath} is already in!')
-                self.path.append(nxtTr)
-                if gate:
-                    print(f'     after append, len(self.path)={len(self.path)}')
-                self.idxpath.append(nxtidx)
-                latestIdx = nxtidx
-                if gate:
-                    print(f'      exit condition: {len(self.path)},{Npts}-> {len(self.path) >= Npts}')
-                if len(self.path) >= Npts:
-                    break
+            if gate:
+                print(f'     Ties: {len(srchFrmHere.minidxs)}/{len(srchFrmHere.minTrs)}')
+            nxtidx,nxtTr = srchFrmHere.select_next()   # break a possible tie btwn branches leaving this pt.
+            if gate:
+                print(f' ...   appending {nxtidx}')
+                if nxtidx in self.idxpath:
+                    print(f'      {idxpath} is already in!')
+            self.path.append(nxtTr)
+            if gate:
+                print(f'     after append, len(self.path)={len(self.path)}')
+            self.idxpath.append(nxtidx)
+            latestIdx = nxtidx
+            if gate:
+                print(f'      exit condition: {len(self.path)},{Npts}-> {len(self.path) >= Npts}')
+            if len(self.path) >= Npts:
+                break
+
             self.Tcost = cost_idxp6D(costtype, self.idxpath)  # compute total cost of the path
 
             REPORTHISTO = False
@@ -1790,9 +1968,6 @@ class path3D:
             print('{:} Total path cost ({:}) = {:8.2f}: '.format(self.searchtype,costtype,self.Tcost))
             # return path object, float
             return self, self.Tcost
-
-        if BASIC:  # we're not doing basic anymore
-            error("we're not doing BASIC mode anymore")
 
     def check(self): # 3D
         if len(self.path) != Npts-1:
@@ -1839,46 +2014,7 @@ class path3D:
         return x
 
 
-    def plot(self,idx, note=''): # plot a path with trajectories
-        fig = self.plotSetup(note)
-        self.plotOnePath(fig)
-        self.plotDone(fig)
-
-    def plotSetup(self,note):
-        if self.datafile is not None:
-            hashcode = self.datafile.hashcode
-        else:
-            hashcode = ''
-        fig = plt.figure()
-        plt.title('{:}'.format(note))
-        plt.xlabel('X     ('+hashcode+')')
-        plt.ylabel('\dot{X}')
-        plt.grid(True)
-        return fig
-
-    def plotOnePath(self,fig):
-        # get endpoints for arrows
-        x_values = [traj.p1.x for traj in self.path]  # starting values
-        y_values = [traj.p1.v for traj in self.path]
-        x_values.append(self.path[-1].p2.x)
-        y_values.append(self.path[-1].p2.v)
-        ax = plt.gca()
-        ax.plot(x_values, y_values, 'o')
-        arrow_positions = np.array([x_values, y_values]).T
-        arrow_directions = np.diff(arrow_positions, axis=0)
-
-        # Plot arrows on the path at regular intervals
-        arrow_interval = len(self.path) // (N*N-1) # Change 5 to adjust the arrow density
-        #print('arrow_interval: {:}  len(self.path) {:}  N*N {:}'.format(arrow_interval, len(self.path), N*N))
-        arrow_positions = arrow_positions[:-1:arrow_interval]
-        arrow_directions = arrow_directions[::arrow_interval]
-
-        tr = self.path[0]
-        startpt = plt.Circle((tr.p1.x,tr.p1.v),0.05,color='green')
-        ax.add_patch(startpt)
-
-
-    def save(self,fname): # save 3D trajectory for animation and plotting
+    def save3D(self,fname): # save 3D trajectory for animation and plotting
         #
         #   this is a new datafile just for visualization
         #
@@ -1948,23 +2084,6 @@ def main():
     ax.set_xlim([-axlim,axlim])
     ax.set_ylim([-axlim,axlim])
 
-    def plotDone(self,figure):
-        plt.show()
-        df = self.datafile
-        template = f'______________{df.hashcode}.png'
-        print('filename template: ',template)
-        nroot = input('enter name root: (<enter> to not save) ')
-        if len(nroot)>0:
-            nroot += '_' # separate the hash
-            imgdir = df.folder+'writing/'
-            imgname = nroot + df.hashcode
-            my_dpi = 200
-            plotSave(figure, my_dpi, imgdir, imgname)
-
-        else:
-            print('plot image NOT saved')
-
-
     print('\n\n   Cm tests: ')
 
     c1 = Cm()
@@ -2004,7 +2123,7 @@ def main():
         c1.m[10][10] = tr12
 
     # try a path:
-    p = path(gt,c1,r,c)
+    p = path2D(gt,c1,r,c)
     p.heuristicSearch()
 
     print(p)

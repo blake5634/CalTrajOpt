@@ -184,7 +184,7 @@ def main(args):
             dfw.metadata.d['Research Question'] = q
             print(f"RQ0: {dfw.metadata.d['Research Question']}")
             # instantiate a path:
-            p = cto.path(gt,c1)
+            p = cto.path2D(gt,c1)
             path2, cmin = p.search(SEARCHT, dfile=dfw, nsamples=nsearch)
             print(f"RQ1: {dfw.metadata.d['Research Question']}")
 
