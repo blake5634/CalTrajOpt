@@ -63,9 +63,20 @@ def main(args):
     DataFolder = '/home/blake/Sync/Research/CalTrajOpt_RESULTS'
     PointsFolder = '/PointSetsRandom'
     pointsDataFolder = DataFolder + PointsFolder
-    pointsFilename = pointsDataFolder + '/'+pointsDataName  # full path of points file
 
     cto.gridType = gridtype
+
+    if OP_MODE == 'search' and gridtype == 'random':  # we need to read points file
+        # find points file by its hash
+        myf = bd.finder()
+        myf.set_dirs([DataFolder+PointsFolder])
+        print(f' search random looking in {DataFolder+PointsFolder}')
+        keys = [pointsHash, '.csv']            # look for requested rand points file
+        print(f'               looking for {pointsHash}')
+        fns = myf.findh(keys)
+        pointsDataFolder = fns[0][0]  # should be same as DataFolder+PointsFolder above
+        pointsDataName   = fns[0][1]
+        pointsFilename = pointsDataFolder + '/'+pointsDataName  # full path of points file
 
     ##########################################################################
     #

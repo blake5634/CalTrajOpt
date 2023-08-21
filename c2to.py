@@ -187,15 +187,34 @@ def plotSave(fig, dpi, imagedir, imagename):
 class grid2D:
     def __init__(self, N):
         self.N = N
-        self.gr = []
         self.randgrid = False
         self.fromFile = False
+        self.gr = []
         for i in range(self.N):
             row = []
             for j in range(self.N):
                 row.append(point2D(i,j))
             self.gr.append(row)
 
+    def readPoints2D(self,df):  # read randomized points from a file
+        if not self.randgrid:
+            error('readPoints2D: Do not read in points if they are not random')
+        df.open('r')
+        # read in pair of points for each Cm.m entry and store trajectory.
+        ptindex = 0
+        for row in df.reader:
+            i = int(row[0])  # 0 -- N*N-1
+            j = int(row[1])
+            print(f"I'm creating point at {i}, {j}")
+            p1 = point2D(i,j)
+            p1.x = float(row[2])
+            p1.v = float(row[3])
+            self.gr[i][j]=p1
+            ptindex += 1
+        df.close()
+        self.fromFile = True
+        # return the file name from which the pts were read for the record
+        return df.hashcode
 
 #  convert between 6D int coordiates and point index
 def getidx6D(v):
@@ -372,26 +391,6 @@ class point3D:
                 row = [i,j, p1.x, p1.v ]
                 df.write(row)
         df.close()
-
-    def readPoints2D(self,df):  # read randomized points from a file
-        if not self.randgrid:
-            error('readPoints2D: Do not read in points if they are not random')
-        df.open('r')
-        # read in pair of points for each Cm.m entry and store trajectory.
-        ptindex = 0
-        for row in df.reader:
-            i = int(row[0])  # 0 -- N*N-1
-            j = int(row[1])
-            print(f"I'm creating point at {i}, {j}")
-            p1 = point2D(i,j)
-            p1.x = float(row[2])
-            p1.v = float(row[3])
-            self.gr[i][j]=p1
-            ptindex += 1
-        df.close()
-        self.fromFile = True
-        # return the file name from which the pts were read for the record
-        return df.hashcode
 
     def __repr__(self):
         txt = ''
