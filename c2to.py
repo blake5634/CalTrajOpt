@@ -64,8 +64,8 @@ def configure(fp=None):
             gridType = v
         if parname == 'SPACE':
             SPACE = v
-            if v not in(['2D','3D']):
-                error('configure(): SPACE must be "2D" or "3D" not ',v)
+            if v not in(['2D','6D']):
+                error('configure(): SPACE must be "2D" or "6D" not ',v)
         if parname == 'amax':
             AMAX = float(v)
         if parname == 'dt_start': # starting val for constrain_A()
@@ -177,13 +177,13 @@ def setupPoints6D():
     if gridType == 'random':
         print(f'TEST:  generating random grid: {Npts} rows')
         for i in range(Npts):
-            newpt = point3D(getcoord6D(i))
+            newpt = point6D(getcoord6D(i))
             newpt.randomize()
             print('r',end='')
             pts.append(newpt)
     else:
         for i in range(Npts):
-            newpt = point3D(getcoord6D(i))
+            newpt = point6D(getcoord6D(i))
             print('.',end='')
             pts.append(newpt)
     print('')
@@ -234,7 +234,7 @@ def readPoints6D(df):  # read randomized points from a file
             xv.append(float(s))
         if ptindex != getidx6D(iv):
             print(' ... somethings wrong line 235')
-        p1 = point3D(iv)
+        p1 = point6D(iv)
         print(f"I'm creating 6D point at {iv}")
         pts.append(p1)
         ptindex += 1
@@ -323,12 +323,12 @@ def plotSave(fig, dpi, imagedir, imagename):
     f.close()
     ####
 
-class point3D:
+class point6D:
     def __init__(self,iv):
         if len(iv) != 6:
-            error('point3D: invalid index vector')
+            error('point6D: invalid index vector')
         if (N<3):
-            error('point3D class: N must be greater than 2')
+            error('point6D class: N must be greater than 2')
         self.ix = iv[0]
         self.iy = iv[1]
         self.iz = iv[2]
@@ -344,7 +344,7 @@ class point3D:
         #self.ivect = [self.ix, self.iy, self.iz, self.ixd, self.iyd, self.izd]
         self.ivect = iv
         if max(self.ivect) > N-1:
-            error('point3D: an index is too big for N!')
+            error('point6D: an index is too big for N!')
         self.xvect = [self.x,self.y,self.z,self.xd,self.yd,self.zd]
         self.valid = True
 
@@ -387,13 +387,12 @@ class point3D:
                 df.write(row)
         df.close()
 
+    #6D
     def __repr__(self):
-        txt = ''
-        for i in range(self.N):
-            txt += '       '
-            for j in range(self.N):
-                txt +=  ' ({:5.2f},{:5.2f})'.format(self.gr[i][j].x, self.gr[i][j].v)
-            txt += '\n'
+        txt = '['
+        for x in self.xvect:
+            txt += f' {x:5.1f}'
+        txt += ']'
         return txt
 
 class point2D:
@@ -557,11 +556,11 @@ class trajectory2D:
         return str(self.p1) + ' ---> ' + str(self.p2)
 
 
-class trajectory3D:
+class trajectory6D:
     global Cm
 
     def __init__(self,p1,p2):
-        #print('trajectory3D: p1,p2: ',p1,p2)
+        #print('trajectory6D: p1,p2: ',p1,p2)
         self.p1 = p1
         self.p2 = p2
         self.a0 = [0,0,0]
@@ -574,7 +573,7 @@ class trajectory3D:
         self.e_cost = None
         self.t_cost = None
 
-    #3D
+    #6D
     def compute(self,dt):
         p1 = self.p1
         p2 = self.p2
@@ -595,7 +594,7 @@ class trajectory3D:
             self.a2[i] = (dx - p1.xvect[i+3]*b0 - self.a3[i]*b2)/b1
         self.computed = True
 
-    #3D
+    #6D
     def x(self,t):
         rv = [0,0,0]
         for i in range(3):
@@ -612,7 +611,7 @@ class trajectory3D:
             rv[i] =       2.0*self.a2[i]    + 6.0*self.a3[i]*t
         return rv
 
-    #3D
+    #6D
     def get_Amax(self,dt):
         if not self.computed:
             error('cant get_Amax() unless tr.computed is True')
@@ -630,7 +629,7 @@ class trajectory3D:
 
 
     #
-    # it seems constrain_A can be identical for 3D and 1D(!)
+    # it seems constrain_A can be identical for 6D and 1D(!)
     #
     def constrain_A(self):
         # hack for fixed dt
@@ -665,10 +664,10 @@ class trajectory3D:
         self.compute(self.dt) # because we changed dt
         return dt
 
-    #3D
-    def timeEvolution(self,ACC_ONLY = False):  #3D & 6D
+    #6D
+    def timeEvolution(self,ACC_ONLY = False):  #6D & 6D
         if not self.computed and not self.constrained:
-            error('Cant compute 3D timeEvolution until trajectory is computed and constrained')
+            error('Cant compute 6D timeEvolution until trajectory is computed and constrained')
         Np = 20-1
         x = []
         v = []
@@ -699,7 +698,7 @@ class trajectory3D:
             return a
         else:
             return t,x,v,a
-    #3D
+    #6D
     def getCosts(self,Cm):
         idx1 = getidx6D(self.p1.ivect)
         idx2 = getidx6D(self.p2.ivect)
@@ -716,7 +715,7 @@ class trajectory3D:
         return ct,ce
     #
     #   Energy cost: sum of squared acceleration
-    def cost_e(self, a):  #3D
+    def cost_e(self, a):  #6D
         if not self.computed and not self.constrained:
             error('Cant compute cost_e until trajectory is computed and constrained')
         c = 0.0
@@ -795,7 +794,7 @@ class Cm2D: # matrix full of trajectory2D objs
 def cost_idxp6D(typestr, idxpath, Cm):   # compute total cost from a list of indices
     L = len(idxpath)-1
     if L != Npts-1:
-        error('not a correct length path!: '+str(L))
+        error('cost_idxp6D: not a correct length path!: '+str(L))
     Tc = 0.0
     for i in range(L):
         i1 = idxpath[i]
@@ -803,7 +802,7 @@ def cost_idxp6D(typestr, idxpath, Cm):   # compute total cost from a list of ind
         if i1==i2:
             error('path repeats a node index')
         #ct,ce = Cm.m[i1][i2]
-        tr = trajectory3D(pts[i1],pts[i2])
+        tr = trajectory6D(pts[i1],pts[i2])
         tr.getCosts(Cm)
         ce = tr.e_cost
         ct = tr.t_cost
@@ -858,12 +857,12 @@ class Cm6D:  # save memory, Cm.m only contains cost pair ct,ce
                 if nf%2000==0:
                     pct = i1/M
                     print('fill is {:.0%} done'.format(pct))
-                p1 = point3D(getcoord6D(i1))
-                p2 = point3D(getcoord6D(j1))
+                p1 = point6D(getcoord6D(i1))
+                p2 = point6D(getcoord6D(j1))
                 if  self.randgrid:  # select uniform random point location
                     p1.randomize()  # this is broken and we're not using .fill anymore! (8/2)
                     p2.randomize()
-                t = trajectory3D(p1,p2)
+                t = trajectory6D(p1,p2)
                 if (p1 == p2):
                     t.valid = False  # eliminate self transitions
                 else:
@@ -1553,7 +1552,7 @@ class search_from_here6D:
         #tc,ec = self.path.Cm.m[i1][i2]
         p1 = pts[i1]
         p2 = pts[i2]
-        tr = trajectory3D(p1,p2)
+        tr = trajectory6D(p1,p2)
         tc,te = tr.getCosts(Cm)
         #except Exception as ex:
             #print('Exception in eval_cost:', type(ex).__name__, ex.args)
@@ -1567,7 +1566,7 @@ class search_from_here6D:
         elif self.costtype == 'time':
             retCost = tc # precomputed
         else:
-            error('search:set_costtype: unknown cost type (3D): '+costtype)
+            error('search:set_costtype: unknown cost type (6D): '+costtype)
         return retCost
 
     def select_next(self):
@@ -1587,32 +1586,32 @@ class search_from_here6D:
         # pick one at random
         #print('select_next: choosing a random min traj! from ',len(self.minidxs))
         ti = random.choice(self.minidxs) # index of next traj
-        #tr = trajectory3D(point3D(getcoord6D(self.pstartIdx)),point3D(getcoord6D(ti)))
-        tr = trajectory3D(pts[self.pstartIdx],pts[ti])
+        #tr = trajectory6D(point6D(getcoord6D(self.pstartIdx)),point6D(getcoord6D(ti)))
+        tr = trajectory6D(pts[self.pstartIdx],pts[ti])
         self.mark[ti] = False  # mark new point as visited
         return ti,tr #chosen next traj index, chosen next traj trajectory
 
-    def find_all_cminTrs(self,index,vect): # find a list of all next pts for which cost ~= cmin
+    def find_all_cminTrs(self,index,vect, Cm): # find a list of all next pts for which cost ~= cmin
         epsilon = self.cmin * 0.02 # define 'close'
         if self.mark[index]:
-            tc = self.eval_cost(self.pstartIdx,index)  # get cost for this branch
+            tc = self.eval_cost(self.pstartIdx,index, Cm)  # get cost for this branch
             if abs(tc-self.cmin) < epsilon:
-                tr = trajectory3D(pts[self.pstartIdx],pts[index])
+                tr = trajectory6D(pts[self.pstartIdx],pts[index])
                 self.minTrs.append(tr)
                 self.minidxs.append(index)
         if len(self.minTrs) > self.path.nmin_max: # find the longest list length
             self.path.nmin_max = len(self.minTrs)
         self.ties = len(self.minidxs) #how many ties at this node??
 
-class path3D:
+class path6D:
     #def __init__(self,Cm):
     def __init__(self):
         self.Cm = None     # cost matrix (actually trajectories)
-        ##sizer('path3D.Cm: ',self.Cm)
+        ##sizer('path6D.Cm: ',self.Cm)
         self.sr = startrow
         self.sc = startcol
         self.mark = [True for x in range(Npts)]  # true if pt is UNvisited
-        ##sizer('path3D.mark: ',self.mark)
+        ##sizer('path6D.mark: ',self.mark)
         self.mark[self.sr*N+self.sc] = False # mark our starting point (can be overridden)
         self.Tcost = 0.0
         self.path = []  # the path as a list of trajectories
@@ -1623,6 +1622,7 @@ class path3D:
         self.tie_freq = np.zeros(MAXTIEHISTO)  # histogram of how many ties of each length
         self.ties = 0
 
+    #6D
     def search(self,searchtype,dfile=None,nsamples=1000,profiler=None):
         predict_timing(dfile, searchtype,PCNAME, nsamples)
         #
@@ -1748,8 +1748,8 @@ class path3D:
         n = -1
         cmin = 99999999999
         cmax = 0
-        pmax = path3D()
-        pmin = path3D()
+        pmax = path6D()
+        pmin = path6D()
         updaterate = nsamples//20
         for p in piter:  # piter iterates to a series of lists of point indices
             n+=1
@@ -1759,7 +1759,7 @@ class path3D:
             c = cost_idxp6D(costtype, idxpath,self.Cm)  #what is cost of this path?
             if n%updaterate == 0:
                 pct = 100.0*n/nsamples
-                print(f'{pct:4}%') # I'm alive!
+                print(f'seach completion: {pct:4}%') # I'm alive!
             if STOREDATA:
                 row = idxpath # list of int index pts
                 row.append(c) # tack on the cost
@@ -1830,6 +1830,8 @@ class path3D:
         cmin = 99999999999
         cmax = 0
         maxTies = 0
+        self.Cm = Cm6D()   # this will store costs for each Tr  as they are encountered
+
         if nsearch > 2*Npts:  # for big enough searches, allocate same # to all start points
             nperstart = nsearch//Npts
             LOOPbySTARTpt = True
@@ -1859,7 +1861,7 @@ class path3D:
                 self.Tcost = 0.0
 
                 # do the search
-                pself,c = self.heuristicSearch3D(startPtIdx) #including random tie breakers
+                pself,c = self.heuristicSearch6D(startPtIdx) #including random tie breakers
                 if  pself.ties > maxTies:
                     maxTies = pself.ties
                 #
@@ -1869,12 +1871,12 @@ class path3D:
                 df.write(datarow)
                 if c < cmin: # find lowest cost of the runs
                     cmin=c
-                    pmin = path3D()
+                    pmin = path6D()
                     pmin.path = pself.path
                     pmin.Tcost = c
                 if c > cmax: # find highest cost
                     cmax = c
-                    pmax = path3D()
+                    pmax = path6D()
                     pmax.path = self.path
                     pmax.Tcost = c
         df.metadata.d['Min Cost']=cmin
@@ -1912,7 +1914,7 @@ class path3D:
         return pmin,pmin.Tcost
 
     # 6D
-    def heuristicSearch3D(self, idx1, profiler=None):
+    def heuristicSearch6D(self, idx1, profiler=None):
         # sanity check!!
         if Npts > 1.0E4:
             error('too big a search!!: '+float(Npts))
@@ -1928,11 +1930,14 @@ class path3D:
         latestIdx = startPtIdx
         #while len(self.path) < (Npts):
         updaterate = Npts//10
+        print('                 [..........]')
+        print(' path completion: ',end='')
         while True:
             li = len(self.path)
             if li%updaterate==0:
                 pct = 1+int(100.0 * li / Npts)
-                print(f' completion: {pct:2}%')
+                #print(f' completion: {pct:2}%')
+                print('*',flush=True, end='')
             srchFrmHere = search_from_here6D(self.mark,self)
             srchFrmHere.cmin = 99999999 # just being sure/clear
             srchFrmHere.pstartIdx = latestIdx  # updated at end of this loop!
@@ -1941,43 +1946,44 @@ class path3D:
             srchFrmHere.IsawOne = False
 
             ### iteration through the open branches from this node
-            srchFrmHere.iterate(N,srchFrmHere.find_cmin)
-            #gate = li > 725 or li < 4
-            gate = False
-            if gate:
-                print(f'{li}: Started at: {latestIdx}: any?: {srchFrmHere.IsawOne}, minfound: {srchFrmHere.cminFound}, mincost: {srchFrmHere.cmin}')
+            srchFrmHere.iterate(N,srchFrmHere.find_cmin, self.Cm)
+            #DEBUGgate = li > 725 or li < 4
+            DEBUGgate = False
+            if DEBUGgate:
+                print(f'pL={li}: Started at: {latestIdx}: any mins?: {srchFrmHere.IsawOne}, minfound: {srchFrmHere.cminFound}, mincost: {srchFrmHere.cmin}')
             if not srchFrmHere.cminFound:
                 error('heuristic search iteration: somethings wrong, need to find_cmin before find_all')
-            srchFrmHere.iterate(N,srchFrmHere.find_all_cminTrs)
+            srchFrmHere.iterate(N,srchFrmHere.find_all_cminTrs, self.Cm)
             ###
 
             # keep track of greatest number of ties along this path
             if srchFrmHere.ties > self.maxTiesHSearch:
                 self.maxTiesHSearch = srchFrmHere.ties
 
-            if gate:
-                print(f'     Ties: {len(srchFrmHere.minidxs)}/{len(srchFrmHere.minTrs)}')
+            if DEBUGgate:
+                print(f'pL={li}:     Ties: {len(srchFrmHere.minidxs)}/{len(srchFrmHere.minTrs)}')
             nxtidx,nxtTr = srchFrmHere.select_next()   # break a possible tie btwn branches leaving this pt.
-            if gate:
-                print(f' ...   appending {nxtidx}')
+            if DEBUGgate:
+                print(f'pL={li}:  ...   appending {nxtidx}')
                 if nxtidx in self.idxpath:
                     print(f'      {idxpath} is already in!')
             self.path.append(nxtTr)
-            if gate:
-                print(f'     after append, len(self.path)={len(self.path)}')
+            if DEBUGgate:
+                print(f'pL={li}:      after append, len(self.path)={len(self.path)}')
             self.idxpath.append(nxtidx)
             latestIdx = nxtidx
-            if gate:
-                print(f'      exit condition: {len(self.path)},{Npts}-> {len(self.path) >= Npts}')
+            if DEBUGgate:
+                print(f'pL={li}:       exit condition: {len(self.path)},{Npts}-> {len(self.path) >= Npts}')
             if len(self.path) >= Npts:
                 break
-            self.Tcost = cost_idxp6D(costtype, self.idxpath,self.Cm)  # compute total cost of the path
-            print('heuristic path search completed!')
-            print('{:} Total path cost ({:}) = {:8.2f}: '.format(self.searchtype,costtype,self.Tcost))
-            # return path object, float
-            return self, self.Tcost
+        print('')
+        self.Tcost = cost_idxp6D(costtype, self.idxpath,self.Cm)  # compute total cost of the path
+        print('heuristic path search completed!')
+        print('{:} Total path cost ({:}) = {:8.2f}: '.format(self.searchtype,costtype,self.Tcost))
+        # return path object, float
+        return self, self.Tcost
     # 6D
-    def check(self): # 3D
+    def check(self): # 6D
         if len(self.path) != Npts-1:
             error('wrong path length '+str(len(self.path)))
         i=0
@@ -1989,14 +1995,14 @@ class path3D:
                     error('discontinuous path: '+str(i-1)+' '+str(i))
             i+=1
     #6D
-    def compute_curves6D(self,idx): #3D
+    def compute_curves6D(self,idx): #6D
         curvepts_x = []
         for i,tr in enumerate(self.path):
             if i in idx:
                 if i == len(self.path):
                     break
                 if not tr.valid:
-                    error('compute_curves()3D: I should not have found an invalid trajectory in path: '+str(i))
+                    error('compute_curves()6D: I should not have found an invalid trajectory in path: '+str(i))
                 if tr is None:
                     error('null traj: '+ str(i) + str(tr))
                 if not tr.computed and not tr.constrained:
@@ -2010,7 +2016,7 @@ class path3D:
         return x
 
     #6D
-    def save3D(self,fname): # save 3D trajectory for animation and plotting
+    def save6D(self,fname): # save 6D trajectory for animation and plotting
         #
         #   this is a new datafile just for visualization
         #
@@ -2104,9 +2110,9 @@ def main():
     assert r==c
     assert r == Npts
 
-    p1 = point3D(getcoord6D(1234))
-    p2 = point3D(getcoord6D(3241))
-    tr12 = trajectory3D(p1,p2)
+    p1 = point6D(getcoord6D(1234))
+    p2 = point6D(getcoord6D(3241))
+    tr12 = trajectory6D(p1,p2)
     tt3d = type(tr12)
 
     if not SKIPFILL:
@@ -2131,8 +2137,8 @@ def main():
     print('DT_START: ',DT_START)
     print('AMAX: ',AMAX)
     for i in range(10):
-        p1 = point3D(getcoord6D(random.randint(0,Npts-1)))
-        p2 = point3D(getcoord6D(random.randint(0,Npts-1)))
+        p1 = point6D(getcoord6D(random.randint(0,Npts-1)))
+        p2 = point6D(getcoord6D(random.randint(0,Npts-1)))
         tr12.p1 = p1
         tr12.p2 = p2
         tr12.constrain_A()
@@ -2174,7 +2180,7 @@ def main():
 
     print('\n\nsearch test 1:   sampling random paths')
     searchtype = 'sampling search'
-    bpath = path3D()
+    bpath = path6D()
     bpath.search(searchtype,dfile=df,nsamples=10000)
 
 

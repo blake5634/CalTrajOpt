@@ -104,19 +104,19 @@ def main(args):
     #
     ##SEARCHT = 'heuristic search' # greedy nearest neighbor (working??)
     #SEARCHT = 'exhaustive'   # enumerate all paths (formerly 'brute force') (2D only!)
-    SEARCHT = 'sampling search' # nsearch random paths
-    #SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
+    #SEARCHT = 'sampling search' # nsearch random paths
+    SEARCHT = 'multi heuristic' # repeated heuristic search all starting pts
     #
     #   Choose search size
     #
     #nsearch = int(np.math.factorial(Npts) * 0.10)  # 10% of 3x3
     #nsearch = 1000000  # 1M
-    nsearch = 2000
+    nsearch = 200
     #
     #   Choose cost type
     #
-    cto.costtype = 'time'
-    #cto.costtype = 'energy'
+    #cto.costtype = 'time'
+    cto.costtype = 'energy'
     cto.NPC = 30   #  # of simulation points in 0-dt time interval
     #
     ##########################################################################
@@ -178,8 +178,8 @@ def main(args):
             path2, cmin = p.search(SEARCHT, dfile=dfw, nsamples=nsearch)
             print(f"RQ1: {dfw.metadata.d['Research Question']}")
 
-            print('Optimal path returned: (tra)', path2.path)
-            print('Optimal path returned: (idx)', path2.idxpath)
+            #print('Optimal path returned: (tra)', path2.path)
+            #print('Optimal path returned: (idx)', path2.idxpath)
             # is it a valid path?
             #p.check()
             if gridtype=='random':
@@ -223,6 +223,7 @@ def main(args):
 
 
         elif OP_MODE == 'search': # search mode with rect grid or read-in points
+            cto.pts = cto.setupPoints6D()   # just store points instead of cost matrix Cm
             if gridtype == 'random': # we should read from file for repeatability
                 # create the random points file reader
                 dfr = bd.datafile('','','') #'' ok for reading
@@ -244,7 +245,7 @@ def main(args):
             q = input('Research Question for this 6D search: ')
             dfw.metadata.d['Research Question'] = q
             # instantiate a path:
-            p = cto.path3D()
+            p = cto.path6D()
             # search will close the datafile
             path2, cmin = p.search(SEARCHT, dfile=dfw, nsamples=nsearch)
             # search will close the datafile
