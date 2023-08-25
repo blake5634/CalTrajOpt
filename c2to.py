@@ -200,7 +200,7 @@ def savePoints6D(df):   # save points generated into a file
     df.metadata.d['Ncols'] = len(df.metadata.d['Names'])
     if df.metadata.d['Ncols'] != 12:
         error('somethings wrong in savePoints6D')
-    dfbf.metadata.d['Space'] = '6D'
+    df.metadata.d['Space'] = '6D'
     df.descript_str = 'randomGridPointSet' # standardize for point storage filename fields
     df.metadata.d['Research Question'] = 'RandomGridPointSet' # standardize for RQ
     df.open('w')
@@ -237,6 +237,13 @@ def readPoints6D(df):  # read randomized points from a file
             print(' ... somethings wrong line 235')
         p1 = point6D(iv)
         print(f"I'm creating 6D point at {iv}")
+        p1.x = xv[0]  # transfer the random data to this pt.
+        p1.y = xv[1]
+        p1.z = xv[2]
+        p1.xd = xv[3]
+        p1.yd = xv[4]
+        p1.zd = xv[5]
+        p1.xvect = xv
         pts.append(p1)
         ptindex += 1
     df.close()
