@@ -199,7 +199,8 @@ def savePoints6D(df):   # save points generated into a file
     df.metadata.d['Names'] = [f'c{i}' for i in range(6)]+[f'x{i}' for i in range(6)]
     df.metadata.d['Ncols'] = len(df.metadata.d['Names'])
     if df.metadata.d['Ncols'] != 12:
-        error('somethings wrong in savePOitns6D')
+        error('somethings wrong in savePoints6D')
+    dfbf.metadata.d['Space'] = '6D'
     df.descript_str = 'randomGridPointSet' # standardize for point storage filename fields
     df.metadata.d['Research Question'] = 'RandomGridPointSet' # standardize for RQ
     df.open('w')
@@ -376,6 +377,8 @@ class point6D:
         df.metadata.d['Types'] = [it,it,ft,ft]
         df.metadata.d['Names'] = ['i1','j1','x1','v1']
         df.metadata.d['Ncols'] = len(df.metadata.d['Names'])
+        df.metadata.d['Space'] = '2D'
+        df.metadata.d['Grid dim'] = N
         df.descript_str = 'randomGridPointSet' # standardize for point storage filename fields
         df.metadata.d['Research Question'] = 'RandomGridPointSet' # standardize for RQ
         df.open('w')
@@ -736,6 +739,18 @@ class trajectory6D:
     def __repr__(self):
         return str(self.p1) + ' ---> ' + str(self.p2)
 
+#6D
+def getCosts_ij(idx1,idx2,Cm):
+    if Cm.m[idx1][idx2] != 0: # if we've already computed
+        ct,ce = Cm.m[idx1][idx2]
+    else:
+        tr = trajectory6D(pts[idx1],pts[idx2])
+        tr.constrain_A()
+        a = tr.timeEvolution(ACC_ONLY=True)
+        ce = tr.cost_e(a)
+        ct = tr.cost_t(a)
+        Cm.m[idx1][idx2] = (ct,ce) # store for potential re-use
+    return ct,ce
 
 class Cm2D: # matrix full of trajectory2D objs
     def __init__(self,df=None):
@@ -1034,6 +1049,7 @@ class path2D:
                 names.append(f'p{i}')
             names.append('Cost')
             dfbf.metadata.d['Ncols'] = len(names)
+            dfbf.metadata.d['Space'] = '2D'
             dfbf.metadata.d['Types'] = tps
             dfbf.metadata.d['Names'] = names
             dfbf.metadata.d['CostType'] = costtype
@@ -1168,6 +1184,8 @@ class path2D:
         self.datafile = dfile #keep track of this for adding metadata
         df = dfile
         print('Saving permutations (paths) to: ',df.name)
+
+        # set up the output file metadata
         itype = str(type(5))
         ftype = str(type(3.1415))
         tps = [itype]*(Npts)      # path point-index sequence
@@ -1180,6 +1198,8 @@ class path2D:
         df.metadata.d['Names'] = names
         df.metadata.d['Ncols'] = len(names)
         df.metadata.d['CostType'] = costtype # 'energy' or 'time'
+        df.metadata.d['Space'] = '2D'
+        df.metadata.d['Grid dim'] = N
         df.metadata.d['SearchType'] = self.searchtype # 'exhaustive', 'heuristic' etc.
         df.metadata.d['#samples'] = nsearch
 
@@ -1193,38 +1213,37 @@ class path2D:
         cmin = 99999999999
         cmax = 0
         maxTies = 0
-        if nsearch > 2*Npts:  # for big enough searches, allocate same # to all start points
-            nperstart = nsearch//(Npts)
-            MULTI_SEARCH_PER_PT = True
-            print(f'searching the {Npts} start points {nperstart} times each.')
-        else:
-            nperstart = nsearch   # if less, just pick random start points
-            MULTI_SEARCH_PER_PT = False
-            print(f'searching {nperstart} random start pts, once each.')
 
-        x = input('.....  db pause...')
-        for i in range(Npts-1): # go through the start pts
-            if MULTI_SEARCH_PER_PT:
-                if i%2000==0:
-                    print('MH Search iteration: ',i)  #I'm alive
-            else:
-                pass
+        if nsearch > 2*Npts:  # for big enough searches, allocate same # to all start points
+            nperstart = nsearch//Npts
+            MULTI_SEARCH_PER_PT = True
+            loopcount = Npts
+        else:
+            nperstart = 1   # if less, just pick random start points
+            MULTI_SEARCH_PER_PT = False
+            loopcount = nsearch
+        print(f'starting {nsearch} 2Diterations with loopcount {loopcount} and nerstart {nperstart}')
+        x = input (' ... testpause ...')
+        for i in range(loopcount): # go through the start pts
             for m in range(nperstart): # do each start pt this many times
                 # reset search info
                 if not MULTI_SEARCH_PER_PT:
                     # a random start point
-                    startPtIdx = random.randint(0,Npts-1)
+                    startPtIdx = random.randint(0,Npts-1) #randint includes the 2nd val!
                 else:
                     startPtIdx = i
                 self.Tcost = 0.0
                 count = 0
 
+                print(f'       2D iteration  {m}/{nperstart}  for starting point {i+1}/{loopcount}')
                 # do the search
                 pself,c = self.heuristicSearch(startPtIdx) #including random tie breakers
 
                 if pself.maxTiesHSearch > maxTies:
                     maxTies = pself.maxTiesHSearch
+                #
                 datarow = pself.idxpath
+                #
                 #print('my path: ',datarow)
                 datarow.append(c) # last col is cost
                 df.write(datarow)
@@ -1238,8 +1257,6 @@ class path2D:
                     pmax = path2D(self.grid,self.Cm)
                     pmax.path = self.path
                     pmax.Tcost = c
-            if not MULTI_SEARCH_PER_PT:
-                break
         df.metadata.d['Min Cost']=cmin
         df.metadata.d['Max Cost']=cmax
         df.metadata.d['Max Ties']=maxTies
@@ -1283,6 +1300,7 @@ class path2D:
         # return path object, float
         return pmin,pmin.Tcost
 
+    #2D
     def heuristicSearch(self,startptidx):  # path class
         # add to self.path[] one traj at a time greedily
 
@@ -1304,7 +1322,8 @@ class path2D:
         #   build the path by greedy algorithm
         #
         print('   >>> New hsearch')
-        while len(self.path) < Npts-1: # build path up one pt at a time
+        #  correct length of path is Npts-1 trajectories
+        while len(self.path) < Npts-1: # build path up one Traj at a time
             # these store all unvisited,valid  branches out of this point/node
             edge_next_tr = []   # trajectory to the next pt
             edge_costs = []  # cost of branch/traj to the next point
@@ -1550,10 +1569,10 @@ class search_from_here6D:
         # i1,i2 are indices of traj start and end pt.
         #try:
         #tc,ec = self.path.Cm.m[i1][i2]
-        p1 = pts[i1]
-        p2 = pts[i2]
-        tr = trajectory6D(p1,p2)
-        tc,te = tr.getCosts(Cm)
+        #p1 = pts[i1]
+        #p2 = pts[i2]
+        #tr = trajectory6D(p1,p2)
+        tc,te = getCosts_ij(i1,i2,Cm)
         #except Exception as ex:
             #print('Exception in eval_cost:', type(ex).__name__, ex.args)
             #print('bad path indeces? ',i1,i2)
@@ -1713,6 +1732,8 @@ class path6D:
             df.metadata.d['Types'] = tps
             df.metadata.d['Names'] = names
             df.metadata.d['CostType'] = costtype
+            df.metadata.d['Space'] = '6D'
+            df.metadata.d['Grid dim'] = N
             df.metadata.d['SearchType'] = self.searchtype
             df.metadata.d['#samples'] = nsamples
             #
@@ -1750,7 +1771,7 @@ class path6D:
         cmax = 0
         pmax = path6D()
         pmin = path6D()
-        updaterate = nsamples//20
+        updaterate = 1 + nsamples//20
         for p in piter:  # piter iterates to a series of lists of point indices
             n+=1
             # p is the current path [idx0,idx1,idx2 ...]
@@ -1805,18 +1826,23 @@ class path6D:
         self.datafile = dfile #keep track of this for adding metadata
         df = dfile
         print('Saving permutations (paths) to: ',df.name)
-        names = []
-        for i in range(Npts):
-            names.append('{:}'.format(i))
-        names.append('Cost')
+
+        # set up the output file metadata
         itype = str(type(5))
         ftype = str(type(3.1415))
         tps = [itype]*(Npts)      # path point-index sequence
         tps.append(ftype) # the path cost's type (float)
+        names = []
+        for i in range(Npts):
+            names.append('{:}'.format(i))
+        names.append('Cost')
         df.metadata.d['Types'] = tps
         df.metadata.d['Names'] = names
         df.metadata.d['Ncols'] = len(names)
         df.metadata.d['CostType'] = costtype # 'energy' or 'time'
+        df.metadata.d['Space'] = '6D'
+        df.metadata.d['Grid dim'] = N
+        df.metadata.d['Grid dim'] = N
         df.metadata.d['SearchType'] = self.searchtype # 'brute force', 'heuristic' etc.
         df.metadata.d['#samples'] = nsearch
 
@@ -1834,38 +1860,38 @@ class path6D:
 
         if nsearch > 2*Npts:  # for big enough searches, allocate same # to all start points
             nperstart = nsearch//Npts
-            LOOPbySTARTpt = True
+            MULTI_SEARCH_PER_PT = True
+            loopcount = Npts
         else:
             nperstart = 1   # if less, just pick random start points
-            LOOPbySTARTpt = False
-        for i in range(Npts): # go through the start pts
-            if LOOPbySTARTpt:
-                if i%20==0:
-                    print('multiple heuristic searches: ',i)  #I'm alive
-            else:
-                print('searching starting point:',i)
-            # go through the N^2 start points with equal number at each
-            startPtIdx = i
+            MULTI_SEARCH_PER_PT = False
+            loopcount = nsearch
+        print(f'starting {nsearch} 6D iterations with loopcount {loopcount} and nperstart {nperstart}')
+        x = input (' ... testpause ...')
+        for i in range(loopcount): # go through the start pts
+            # go through the start points with equal number at each
             for m in range(nperstart): # do each start pt this many times
                 # reset search info
-                print(f'Progress: {i}/{Npts}')
-                print('        iteration  ',m,'/',nperstart,'  for starting point',i)
                 self.mark = [True for x in range(Npts)]
                 count = 0
-                if not LOOPbySTARTpt:
+                if not MULTI_SEARCH_PER_PT:
                     # a random start point
                     startPtIdx = random.randint(0,Npts-1)
+                else:
+                    startPtIdx = i
 
                 # don't think we need these acth
-                self.mark[startPtIdx] = False # mark our starting point
                 self.Tcost = 0.0
+                count = 0
 
+                print(f'       6D iteration  {m+1}/{nperstart}  for starting point {i+1}/{loopcount}')
                 # do the search
                 pself,c = self.heuristicSearch6D(startPtIdx) #including random tie breakers
+
                 if  pself.ties > maxTies:
                     maxTies = pself.ties
                 #
-                datarow = pself.idxpath  # ********
+                datarow = pself.idxpath
                 #
                 datarow.append(c) # last col is cost
                 df.write(datarow)
@@ -1879,6 +1905,7 @@ class path6D:
                     pmax = path6D()
                     pmax.path = self.path
                     pmax.Tcost = c
+
         df.metadata.d['Min Cost']=cmin
         df.metadata.d['Max Cost']=cmax
         df.metadata.d['Max Ties']=self.maxTiesHSearch
@@ -1928,14 +1955,13 @@ class path6D:
         self.idxpath = [startPtIdx] # path has a start point
         self.nmin_max = 0
         latestIdx = startPtIdx
-        #while len(self.path) < (Npts):
         updaterate = Npts//10
-        print('                 [..........]')
+        print(f'                 [..........] path len: {Npts}')
         print(' path completion: ',end='')
         while True:
             li = len(self.path)
             if li%updaterate==0:
-                pct = 1+int(100.0 * li / Npts)
+                #pct = 1+int(100.0 * li / Npts)
                 #print(f' completion: {pct:2}%')
                 print('*',flush=True, end='')
             srchFrmHere = search_from_here6D(self.mark,self)
@@ -1974,7 +2000,7 @@ class path6D:
             latestIdx = nxtidx
             if DEBUGgate:
                 print(f'pL={li}:       exit condition: {len(self.path)},{Npts}-> {len(self.path) >= Npts}')
-            if len(self.path) >= Npts:
+            if len(self.path) >= Npts:  # pts path has the full Npts (not traj's)
                 break
         print('')
         self.Tcost = cost_idxp6D(costtype, self.idxpath,self.Cm)  # compute total cost of the path
