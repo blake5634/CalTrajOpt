@@ -114,8 +114,8 @@ def main(args):
     #
     #   Choose cost type
     #
-    cto.costtype = 'time'
-    #cto.costtype = 'energy'
+    #cto.costtype = 'time'
+    cto.costtype = 'energy'
     cto.NPC = 30   #  # of simulation points in 0-dt time interval
     #
     ##########################################################################
@@ -254,9 +254,9 @@ def main(args):
                 dfw.metadata.d['Random Grid'] = True
             else:
                 dfw.metadata.d['Random Grid'] = False
-            df.metadata.d['Computer Name'] = cto.PCNAME
-            df.metadata.d['N'] = N
-            df.metadata.d['Space'] = SPACE
+            dfw.metadata.d['Computer Name'] = cto.PCNAME
+            dfw.metadata.d['N'] = N
+            dfw.metadata.d['Space'] = SPACE
             dfw.set_folders(DataFolder,'')
             if gridtype=='random':
                 dfw.metadata.d['Points Data Source'] = pointsHash
