@@ -138,6 +138,30 @@ class grid2D:
                 row.append(point2D(i,j))
             self.gr.append(row)
 
+    #2D class grid2D
+    def savePoints2D(self,df):   # save points generated into a file
+        if not self.randgrid:
+            error('savePoints2D: Do not save points if they are not random')
+        # each entry in Cm is a trajectory2D  we need only store p1 and p2
+        it =str(type(5))
+        ft =str(type(3.14159))
+        df.metadata.d['Types'] = [it,it,ft,ft]
+        df.metadata.d['Names'] = ['i1','j1','x1','v1']
+        df.metadata.d['Ncols'] = len(df.metadata.d['Names'])
+        df.metadata.d['Space'] = '2D'
+        df.metadata.d['Grid dim'] = N
+        df.descript_str = 'randomGridPointSet' # standardize for point storage filename fields
+        df.metadata.d['Research Question'] = 'RandomGridPointSet' # standardize for RQ
+        df.open('w')
+        # write out key info for each point.
+        for i in range(N):
+            for j in range(N):
+                p1 = self.gr[i][j]
+                row = [i,j, p1.x, p1.v ]
+                df.write(row)
+        df.close()
+
+    #class grid2D
     def readPoints2D(self,df):  # read randomized points from a file
         if not self.randgrid:
             error('readPoints2D: Do not read in points if they are not random')
@@ -331,6 +355,8 @@ def plotSave(fig, dpi, imagedir, imagename):
     f.close()
     ####
 
+
+
 class point6D:
     def __init__(self,iv):
         if len(iv) != 6:
@@ -374,28 +400,6 @@ class point6D:
             if abs(sxv-xxv) > 0.01:
                 return False
         return True
-
-    def savePoints2D(self,df):   # save points generated into a file
-        if not self.randgrid:
-            error('savePoints2D: Do not save points if they are not random')
-        # each entry in Cm is a trajectory2D  we need only store p1 and p2
-        it =str(type(5))
-        ft =str(type(3.14159))
-        df.metadata.d['Types'] = [it,it,ft,ft]
-        df.metadata.d['Names'] = ['i1','j1','x1','v1']
-        df.metadata.d['Ncols'] = len(df.metadata.d['Names'])
-        df.metadata.d['Space'] = '2D'
-        df.metadata.d['Grid dim'] = N
-        df.descript_str = 'randomGridPointSet' # standardize for point storage filename fields
-        df.metadata.d['Research Question'] = 'RandomGridPointSet' # standardize for RQ
-        df.open('w')
-        # write out key info for each point.
-        for i in range(N):
-            for j in range(N):
-                p1 = self.gr[i][j]
-                row = [i,j, p1.x, p1.v ]
-                df.write(row)
-        df.close()
 
     #6D
     def __repr__(self):
@@ -811,7 +815,6 @@ class Cm2D: # matrix full of trajectory2D objs
                     t.cost_e(a)
                     t.cost_t()
                 self.m[i1][j1] = t   # store the trajectory
-
 
 def cost_idxp6D(typestr, idxpath, Cm):   # compute total cost from a list of indices
     L = len(idxpath)-1
