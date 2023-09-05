@@ -84,11 +84,13 @@ def main(args):
     ##########################################################################
     #
     #    Configure the job
+    #        (gridtype is set by command line args (see above))
     #
-    #SPACE = '2D'
-    SPACE = '6D'
-    #  gridtype is set by command line args (see above)
-    cto.N = 3
+    SPACE = '2D'
+    #SPACE = '6D'
+
+    cto.N = 4
+
     N = cto.N
     if SPACE == '2D':
         Npts = N*N
@@ -101,20 +103,21 @@ def main(args):
     #
     ##SEARCHT = 'heuristic search' # greedy nearest neighbor (working??)
     #SEARCHT = 'exhaustive'   # enumerate all paths (formerly 'brute force') (2D only!)
-    #SEARCHT = 'sampling search' # nsearch random paths
-    SEARCHT = 'multi heuristic' # (NN) repeated heuristic search multiple starting pts
+    SEARCHT = 'sampling search' # nsearch random paths
+    #SEARCHT = 'multi heuristic' # (NN) repeated heuristic search multiple starting pts
     #
     #   Choose search size
     #
     #nsearch = int(np.math.factorial(Npts) * 0.10)  # 10% of 3x3
-    #nsearch = int(1.0E06)  # 1M
+    nsearch = int(1.0E06)  # 1M
+    #nsearch = 50000  # mem limit for 4x4x6
     #nsearch = 2719  # 4x729 # 2D
-    nsearch = 10000  #10k  # 6D about 2 tries per 4096 start points
+    #nsearch = 10000  #10k  # 6D about 2 tries per 4096 start points
     #nsearch = 10
     #
     #   Choose cost type
     #
-    #cto.costtype = 'time'
+    cto.costtype = 'time'
     cto.costtype = 'energy'
     cto.NPC = 30   #  # of simulation points in 0-dt time interval
     #
@@ -143,12 +146,12 @@ def main(args):
     #
     if SPACE == '2D':
         #
-        # create grid
-        gt = cto.grid2D(cto.N)
+        # create grid (only 2D uses a points grid)
+        points_grid = cto.grid2D(cto.N)
         # create cost matrix
         c1 = cto.Cm2D()
         if gridtype == 'random':
-            gt.randgrid = True
+            points_grid.randgrid = True
             c1.set_GridRandomize()  # select random instead of grid
 
         if OP_MODE == 'generate':
@@ -157,12 +160,12 @@ def main(args):
             df = bd.datafile(f'2DrandomGrid{N}x{N}PointSet','BH','simulation')
             codeFolder = ''
             df.set_folders(pointsDataFolder,codeFolder) # also creates filename
-            c1.fill(gt)  # randomize and compute traj's and costs
+            c1.fill(points_grid)  # randomize and compute traj's and costs
             df.metadata.d['grid info'] = f'{N}x{N} random grid, {Npts} pts.'
             df.metadata.d['Computer Name'] = cto.PCNAME
             df.metadata.d['N'] = N
             df.metadata.d['Space'] = SPACE
-            gt.savePoints2D(df) #this will set the 'Research Question' to "RandomGridPointSet"
+            points_grid.savePoints2D(df) #this will set the 'Research Question' to "RandomGridPointSet"
             print(f'Random pts saved to {df.name}')
             notes = f'generated random points file: {df.hashcode} {cto.N}x{cto.N}'
             logentry(df,notes)
@@ -174,22 +177,26 @@ def main(args):
                 dfr = bd.datafile('','','') #'' ok for reading
                 dfr.set_folders('','') # '' ok for reading
                 dfr.name = pointsFilename
-                pointSourceHash = gt.readPoints2D(dfr)  #read in the set of random points
-            c1.fill(gt) # calc trajectories and costs after points reading
+                pointSourceHash = points_grid.readPoints2D(dfr)  #read in the set of random points
+            c1.fill(points_grid) # calc trajectories and costs after points reading
             dfw = bd.datafile('2Dsearching','BH','simulation')
             dfw.set_folders(DataFolder,'')
             if gridtype=='random':
                 dfw.metadata.d['Points Data Source'] = pointsHash
             else:
                 dfw.metadata.d['Points Data Source'] = 'Regular Grid'
-            df.metadata.d['Computer Name'] = cto.PCNAME
-            df.metadata.d['N'] = N
-            df.metadata.d['Space'] = SPACE
+            dfw.metadata.d['Computer Name'] = cto.PCNAME
+            dfw.metadata.d['N'] = N
+            dfw.metadata.d['Space'] = SPACE
+            if gridtype == 'random':
+                dfw.metadata.d['Random Grid'] = True
+            else:
+                dfw.metadata.d['Random Grid'] = False
             q = input('Research Question for this 2D search: ')
             dfw.metadata.d['Research Question'] = q
             print(f"RQ0: {dfw.metadata.d['Research Question']}")
             # instantiate a path:
-            p = cto.path2D(gt,c1)
+            p = cto.path2D(points_grid,c1)
             path2, cmin = p.search(SEARCHT, dfile=dfw, nsamples=nsearch)
             print(f"RQ1: {dfw.metadata.d['Research Question']}")
 
@@ -247,7 +254,7 @@ def main(args):
                 dfr.set_folders('','') # '' ok for reading
                 dfr.name = pointsFilename
                 pointSourceHash = cto.readPoints6D(dfr)  #read in the set of random points
-            # not for 6D: c1.fill(gt) # calc  costs after points reading
+            # not for 6D: c1.fill(points_grid) # calc  costs after points reading
             dfw = bd.datafile('6Dsearching','BH','simulation')
             dfw.metadata.d['Computer Name'] = cto.PCNAME
             if gridtype == 'random':
