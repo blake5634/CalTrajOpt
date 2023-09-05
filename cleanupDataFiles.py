@@ -21,7 +21,7 @@ def main(args):
     if len(args) > 1: # cmd line delete specific hash files and purge from log
         hlist = args[1:]
         #print('Test0: hlist: ',hlist)
-        if hlist[0] == '-listOnly':
+        if hlist[0] == '-listOnly' or hlist[0] == '--listOnly':
             #print(' I caught listOnly flag!')
             flags += ['listOnly']
             hlist = hlist[1:]  # cut first entry

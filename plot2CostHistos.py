@@ -19,8 +19,8 @@ def main(args):
     #Cm = cto.Cm()
     #Cm.fill(gr)
 
-    if len(sys.argv) != 3:
-        bd.brl_error('usage: >python3 plot2CostHistos.py  hash1 hash2 ')
+    if len(sys.argv) != 4:
+        bd.brl_error('usage: >python3 plot2CostHistos.py  hash1 hash2 Cmax')
     #####################################################################
     #
     # ask user for a hint so they don't have to enter a long filename
@@ -39,6 +39,7 @@ def main(args):
     #hashstr2 = input('Enter first 4 characters of the hash:')
     hashstr1 = sys.argv[1]
     hashstr2 = sys.argv[2]
+    costMax = float(sys.argv[3])
 
     dfname1 = None
     dfname2 = None
@@ -73,13 +74,24 @@ def main(args):
     ys = [0,0]
     mus = [0,0]
     sds = [0,0]
+    scaleSearchRes = 1000 # scale 2nd distrib mag
     for ip, dfname in enumerate([dfname1, dfname2]):
         try:
             x =metadatas[ip]['CostHistogram_levels'][1:]
         except:
             cto.error('Please run getCostHisto in this data first')
         xs[ip] = x
-        ys[ip] = metadatas[ip]['CostHistogram_values']
+        if ip==1:
+            xs[ip] = [min(x)]+x+[max(x)]  # these help visualize skinny distribs
+            # to compare distros with different n, scale to equalize heights.
+            tmp = [0]
+            for i,val in enumerate(metadatas[ip]['CostHistogram_values']):
+                tmp.append(float(val)*scaleSearchRes)
+            tmp.append(0)
+            ys[ip] = tmp
+
+        else:
+            ys[ip] = metadatas[ip]['CostHistogram_values']
         mus[ip] = metadatas[ip]['CostMean']
         sds[ip] = metadatas[ip]['CostStDev']
 
@@ -105,15 +117,19 @@ def main(args):
             print('maxx: ',maxx, dfname)
         plt.bar(xs[ip],ys[ip],width=barwidth,color=colors[ip])
         #overplot normal distribution
-        curve = norm.pdf(xs[ip],mus[ip],sds[ip])
+        npmin = mus[ip]-3.0*sds[ip]
+        npmax = mus[ip]+3.0*sds[ip]
+        npts = 25
+        xcur = np.linspace(npmin,npmax,npts)
+        curve = norm.pdf(xcur,mus[ip],sds[ip])
         scale = max(ys[ip])/max(curve)
         for i in range(len(curve)):
             curve[i] *= scale
             #c2[i] *= scale
-        plt.plot(xs[ip],curve)
+        plt.plot(xcur,curve)
     #round up maxx by 1000
-    maxx = (maxx//1000 + 1)*100
-    #maxx = 1000
+    #maxx = (maxx//1000 + 1)*100
+    maxx = costMax
     # plot relative to 0 for visual comparison
     plt.xlim([0,maxx])
     plt.title('{:} cost distributions'.format(ct1))
