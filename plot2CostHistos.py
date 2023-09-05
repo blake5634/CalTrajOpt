@@ -74,7 +74,7 @@ def main(args):
     ys = [0,0]
     mus = [0,0]
     sds = [0,0]
-    scaleSearchRes = 1000 # scale 2nd distrib mag
+    scaleSearchRes = 1.0 # scale 2nd distrib mag
     for ip, dfname in enumerate([dfname1, dfname2]):
         try:
             x =metadatas[ip]['CostHistogram_levels'][1:]
