@@ -17,7 +17,14 @@ def main(args):
             '/home/blake/Sync/Research/CalTrajOpt_RESULTS/PointSetsRandom',
             '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing'
             ]
+
+    wlog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/work_logbook.txt'
+    ilog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/image_log.txt'
+    logs = [wlog, ilog]
+
     flags = ['nothing']
+
+
     if len(args) > 1: # cmd line delete specific hash files and purge from log
         hlist = args[1:]
         #print('Test0: hlist: ',hlist)
@@ -39,7 +46,7 @@ def main(args):
         hashs = cleanOutDatafiles([datadir])
         if len(hashs) > 0:
             print('          Now cleaning removed files from logs:')
-            hrem = purgeLogsbyHash(hashs)
+            hrem = purgeLogsbyHash(hashs,logs)
             for h in hrem:
                 log_record_deletions(h,'log entry')
         else:
@@ -171,12 +178,9 @@ def purgeFilesbyHash(hlist,dirs,flags=['None']):
         return []
 
 
-def purgeLogsbyHash(hlist,flags=['None']):
+def purgeLogsbyHash(hlist,logs, flags=['None']):
     print(f'\nChecking  {hlist} in log files.')
     # now purge entries from the logs
-    wlog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/work_logbook.txt'
-    ilog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/image_log.txt'
-    logs = [wlog, ilog]
     for lf in logs:
         justname = lf.split('/')[-1]
         f = open(lf,'r')
