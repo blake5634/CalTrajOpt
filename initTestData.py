@@ -1,13 +1,27 @@
 #
 import os
+import shutil
 import sys
 from pathlib import Path
 import brl_data.brl_data as bd
 
-dir = '/home/blake/Ptmp/CalTrajOpt/testing/'
+tdir = '/home/blake/Ptmp/CalTrajOpt/testing/'
 
 logs = ['/home/blake/Ptmp/CalTrajOpt/testing/log1.txt',
         '/home/blake/Ptmp/CalTrajOpt/testing/log2.txt' ]
+testfolders = ['folder1/','folder2/','folder3/']
+trash = '/home/blake/Ptmp/CalTrajOpt/testing/Trash'
+
+shutil.rmtree(tdir)
+os.mkdir(tdir)
+for fld in testfolders:
+   os.mkdir(tdir+fld)
+os.mkdir(trash)
+
+f = open(tdir+'keepers.txt', 'w')
+for l in ['aaaaaaaa', '1234abcd', 'cc2cff5f', 'dead4568']:
+   print(l,file=f)
+f.close()
 
 keeperfiles = []
 targetfiles = []
@@ -17,25 +31,25 @@ keeperURIs  = []
 for i in range(4):
    targetfiles.append(f'target{bd.brl_id(8)}')
 
-f = open(f'{dir}keepers.txt','r')
+f = open(f'{tdir}keepers.txt','r')
 for URI in f:
    keeperURIs.append(URI.strip())
    keeperfiles.append(f'keeper{URI.strip()}')
 
-for i,f in enumerate( ['folder1/','folder2/','folder3/'] ):
+for i,f in enumerate( testfolders ):
    # clean out old files
-   f2 = dir+f
+   f2 = tdir+f
    filelist = os.listdir(f2)
    for fn in filelist:
       print(f'cleaning up {os.path.join(f2,fn)}')
       os.remove(os.path.join(f2,fn))
    # create new ones
    for k in keeperfiles:
-      keeper = dir+f+k+f'_f{i:02}'+'.txt'
+      keeper = tdir+f+k+f'_f{i:02}'+'.txt'
       print('creating: ',keeper)
       Path(keeper).touch()
    for t in targetfiles:
-      target = dir+f+t+f'_f{i:02}'+'.txt'
+      target = tdir+f+t+f'_f{i:02}'+'.txt'
       print('creating: ',target)
       Path(target).touch()
 

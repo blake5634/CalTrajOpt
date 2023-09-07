@@ -11,41 +11,44 @@ import shutil as shu
 DEBUG = False
 ###ACTION = 'delete'   # actually delete old files
 ACTION = 'archive'  # save old files to trash
-ACTION = 'simulate'
+#ACTION = 'simulate'  # just simulate actions, don't do anything
 
-if DEBUG:
-    trashcan = '/home/blake/Ptmp/CalTrajOpt/testing/Trash'
-else:
-    trashcan = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/Archive'
 
 def main(args):
 
-    #  all the dirs we might find data files
-    dirs = ['/home/blake/Sync/Research/CalTrajOpt_RESULTS',
-            '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data',
-            '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D-Round2',
-            '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data/Gold',
-            '/home/blake/Sync/Research/CalTrajOpt_RESULTS/PointSetsRandom',
-            '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing'
-            ]
+    ##  all the dirs we might find data files
+    #dirs = ['/home/blake/Sync/Research/CalTrajOpt_RESULTS',
+            #'/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data',
+            #'/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D-Round2',
+            #'/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data/Gold',
+            #'/home/blake/Sync/Research/CalTrajOpt_RESULTS/PointSetsRandom',
+            #'/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing'
+            #]
 
+    #actionlogfile = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/deletions.txt'
 
-    wlog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/work_logbook.txt'
-    ilog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/image_log.txt'
-    logs = [wlog, ilog]
+    #wlog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/work_logbook.txt'
+    #ilog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/image_log.txt'
+    #logs = [wlog, ilog]
+    #trashcan = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/Archive'
 
-    deletedLogEntriesFN = 'home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/oldLogEntries.txt'
+    if True:
+        # for testing
+        dirs = ['/home/blake/Ptmp/CalTrajOpt/testing/folder1',
+                '/home/blake/Ptmp/CalTrajOpt/testing/folder2',
+                '/home/blake/Ptmp/CalTrajOpt/testing/folder3'
+                ]
 
-    #if DEBUG:
-        ## for testing
-        #dirs = ['/home/blake/Ptmp/CalTrajOpt/testing/folder1',
-                #'/home/blake/Ptmp/CalTrajOpt/testing/folder2',
-                #'/home/blake/Ptmp/CalTrajOpt/testing/folder3'
-                #]
+        logs = ['/home/blake/Ptmp/CalTrajOpt/testing/log1.txt',
+                '/home/blake/Ptmp/CalTrajOpt/testing/log2.txt' ]
 
-        #logs = ['/home/blake/Ptmp/CalTrajOpt/testing/log1.txt',
-                #'/home/blake/Ptmp/CalTrajOpt/testing/log2.txt' ]
-        #deletedLogEntriesFN = '/home/blake/Ptmp/CalTrajOpt/testing/deletedLogLines.txt'
+        actionlogfile = '/home/blake/Ptmp/CalTrajOpt/testing/deletions.txt'
+        trashcan = '/home/blake/Ptmp/CalTrajOpt/testing/Trash'
+
+    locinfo = { 'dirs' : dirs,
+                'logs' : logs,
+                'actionlogfile' : actionlogfile,
+                'trashcan' : trashcan }
 
     flags = ['nothing']
 
@@ -102,9 +105,9 @@ def main(args):
 
     # 2) purge those files
 
-    hrem = purgeFilesbyHash(targetFileList,dirs)
-    for h in hrem:
-        log_record_deletions(h,'file')
+    hrem = purgeFilesbyHash(targetFileList,dirs,locinfo)
+    #for h in hrem:
+        #log_record_deletions(h,ACTION,'file',locinfo)
 
 
     # 3) find all log entries NOT having URIs2Save in them (hsetLogLines)
@@ -120,16 +123,13 @@ def main(args):
         f.close()
 
     # 4) purge the log entries
-    hrem = purgeLogsbyHash(list(hsetLogLines),logs,deletedLogEntriesFN, flags=flags)
-    for h in hrem:
-        log_record_deletions(h,'log entry')
-
+    hrem = purgeLogsbyHash(list(hsetLogLines),logs, locinfo, flags=flags)
     quit()
 
-def operation(ACTION, fdir, fname):
+def operation(ACTION, fdir, fname,locinfo):
     sourcefile = fdir+'/'+fname
     if ACTION == 'archive':
-        shu.move(sourcefile, trashcan + '/' + fname)
+        shu.move(sourcefile, locinfo['trashcan'] + '/' + fname)
     elif ACTION == 'delete':
         os.remove(sourcefile)
     elif ACTION == 'simulate':
@@ -138,7 +138,7 @@ def operation(ACTION, fdir, fname):
         print('unknown ACTION: ',ACTION)
         quit()
 
-def purgeFilesbyHash(targets,dirs,flags=['None']):
+def purgeFilesbyHash(targets,dirs,locinfo, flags=['None']):
     hashesRemoved = set()
     myf = bd.finder()
     myf.set_dirs(dirs)
@@ -163,16 +163,17 @@ def purgeFilesbyHash(targets,dirs,flags=['None']):
             elif ACTION == 'simulate':
                 print(' ... simulating ',fn)
             else:
-                print(f' ... archiving {fn} to {trashcan} ...')
+                print(f" ... archiving {fn} to {locinfo['trashcan']} ...")
             for h in bd.getHashFromFilename(fn):
                 hashesRemoved.add(h)
-            operation(ACTION, fd[0],fd[1])
+            operation(ACTION, fd[0],fd[1],locinfo)
+            log_record_deletions(h,ACTION,'file',locinfo['actionlogfile'])
         return list(hashesRemoved)
     else:
         print('removing canceled')
         return []
 
-def purgeLogsbyHash(hlist,logs,deleteLogFile,flags=['None']):
+def purgeLogsbyHash(hlist,logs,locinfo, flags=['None']):
     print(f'\nChecking  {hlist} in log files.')
     # now purge entries from the logs
     for lf in logs:
@@ -185,9 +186,9 @@ def purgeLogsbyHash(hlist,logs,deleteLogFile,flags=['None']):
             for h in hlist:
                 if h in line:
                     save = False
-            if save or ACTION == 'simulate':
+            if save:  # always keep the lines if simulating
                 keeplines.append(line)
-            else:
+            if not save:
                 deletelines.append(line)
 
         if 'listOnly' in flags:
@@ -208,16 +209,14 @@ def purgeLogsbyHash(hlist,logs,deleteLogFile,flags=['None']):
         if 'listOnly' not in flags:
             x = input(f'\n   OK to {ACTION} {len(deletelines)} entries from {justname}? (y/N): ')
             if x.lower() == 'y':
-                # now modify the file
-                f = open(lf,'w')
-                for l in keeplines:
-                    print(l.strip(),file=f)
-                f.close()
-                if ACTION=='archive' or ACTION=='delete':  # move lines to the deleteLogFile
-                    f = open(deleteLogLogFile, 'a')
-                    for l in deletelines:
-                        print(l,file=f)
+                if ACTION != 'simulate':
+                    # now modify the file
+                    f = open(lf,'w')
+                    for l in keeplines:
+                        print(l.strip(),file=f)
                     f.close()
+                    for l in deletelines:
+                        log_record_deletions(bd.getHashFromFilename(l),ACTION,'log entry',locinfo['actionlogfile'])
                 print(f' {len(deletelines)} lines {ACTION}ed from {justname}.')
             else:
                 print(' purging logs canceled.')
@@ -225,14 +224,17 @@ def purgeLogsbyHash(hlist,logs,deleteLogFile,flags=['None']):
         print('\n\n             List only, no actions were taken.')
     return [] # we don't log hashes deleted from log files
 
-def log_record_deletions(hash, dtype):
-    logfile = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/deletions.txt'
-    f = open(logfile, 'a')
-    now = dt.datetime.now()
-    dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
-    logline = f'{dtstring}: deleted {dtype} for {hash}'
-    print(logline,file=f)
-    f.close()
+def log_record_deletions(hash, action, dtype, logfile):
+    if action == 'simulate':
+        print(f'   simulating recording a {dtype} deletion in {logfile}')
+        return
+    else:
+        f = open(logfile, 'a')
+        now = dt.datetime.now()
+        dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
+        logline = f'{dtstring}: {action}ed {dtype} for {hash}'
+        print(logline,file=f)
+        f.close()
 
 def logentry(df,notes):
     logdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
