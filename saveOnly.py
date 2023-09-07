@@ -11,6 +11,7 @@ import shutil as shu
 DEBUG = False
 ###ACTION = 'delete'   # actually delete old files
 ACTION = 'archive'  # save old files to trash
+ACTION = 'simulate'
 
 if DEBUG:
     trashcan = '/home/blake/Ptmp/CalTrajOpt/testing/Trash'
@@ -33,6 +34,8 @@ def main(args):
     ilog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/image_log.txt'
     logs = [wlog, ilog]
 
+    deletedLogEntriesFN = 'home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/oldLogEntries.txt'
+
     #if DEBUG:
         ## for testing
         #dirs = ['/home/blake/Ptmp/CalTrajOpt/testing/folder1',
@@ -42,6 +45,7 @@ def main(args):
 
         #logs = ['/home/blake/Ptmp/CalTrajOpt/testing/log1.txt',
                 #'/home/blake/Ptmp/CalTrajOpt/testing/log2.txt' ]
+        #deletedLogEntriesFN = '/home/blake/Ptmp/CalTrajOpt/testing/deletedLogLines.txt'
 
     flags = ['nothing']
 
@@ -77,22 +81,28 @@ def main(args):
     fdList = []
     hset = set()
     for d in dirs:
-        fs = os.listdir(d) # file names
-        for f in fs:
-            includeInAction = True
-            thishash = bd.getHashFromFilename(f)
-            if thishash in URIs2Save:
-                includeInAction = False # were saving these!
-            if includeInAction:
-                print('   old file list: appending: ',thishash)
-                fdList.append([d,f])
-                hset.add(thishash)
+        files = os.listdir(d) # file names
+        for fn in files:
+            theseHs = bd.getHashFromFilename(fn)
+            for thishash in theseHs:
+                #print('processing: ', thishash)
+                # do not collect the hash if it is "None" or is a keeper
+                if thishash not in URIs2Save and thishash is not None:
+                    #print('   old file hash list: appending: ',thishash)
+                    fdList.append([d,f])
+                    hset.add(thishash)
 
-    hlist = list(hset)
-    print(f'We have identified {len(hlist)} hashes to {ACTION}.')
+    targetFileList = []
+    n = 0
+    for hl in list( hset):
+        n+=1
+        targetFileList.append(hl)  # these are 1-member lists: [ filename ]
+
+    print(f'We have identified {len(targetFileList)} hashes to {ACTION}.')
+
     # 2) purge those files
 
-    hrem = purgeFilesbyHash(hlist,dirs)
+    hrem = purgeFilesbyHash(targetFileList,dirs)
     for h in hrem:
         log_record_deletions(h,'file')
 
@@ -103,39 +113,41 @@ def main(args):
     for fn in logs:
         f = open(fn,'r')
         for line in f:
-            includeInAction = True
-            thishash = bd.getHashFromFilename(line) # None if line has no hash in it
-            if thishash in URIs2Save or thishash is None:
-                includeInAction = False # were saving these!
-            if includeInAction:
-                hsetLogLines.add(thishash)
+            hashs = bd.getHashFromFilename(line) # None if line has no hash in it
+            for thishash in hashs:
+                if thishash not in URIs2Save and thishash is not None:
+                    hsetLogLines.add(thishash)
         f.close()
 
     # 4) purge the log entries
-    hrem = purgeLogsbyHash(list(hsetLogLines),logs,flags=flags)
+    hrem = purgeLogsbyHash(list(hsetLogLines),logs,deletedLogEntriesFN, flags=flags)
     for h in hrem:
         log_record_deletions(h,'log entry')
 
     quit()
 
 def operation(ACTION, fdir, fname):
+    sourcefile = fdir+'/'+fname
     if ACTION == 'archive':
-        shu.move(fdir+'/'+fname, trashcan + '/' + fname)
+        shu.move(sourcefile, trashcan + '/' + fname)
     elif ACTION == 'delete':
-        os.remove(fdir+'/'+fname)
+        os.remove(sourcefile)
+    elif ACTION == 'simulate':
+            pass
     else:
         print('unknown ACTION: ',ACTION)
         quit()
 
-def purgeFilesbyHash(hlist,dirs,flags=['None']):
+def purgeFilesbyHash(targets,dirs,flags=['None']):
     hashesRemoved = set()
     myf = bd.finder()
     myf.set_dirs(dirs)
     fds = [] # 'fd' is a pair (dir,fname)
-    for h in hlist:
+    for h in targets:
         keys = [h]
         fds += myf.findh(keys) # get all files with this hash
     print(f' I found {len(fds)} files matching the hash list:')
+
     i=0
     for fd in fds:
         i+=1
@@ -148,16 +160,19 @@ def purgeFilesbyHash(hlist,dirs,flags=['None']):
             fn = fd[1]
             if ACTION == 'delete':
                 print(' ... removing ',fn)
+            elif ACTION == 'simulate':
+                print(' ... simulating ',fn)
             else:
                 print(f' ... archiving {fn} to {trashcan} ...')
-            hashesRemoved.add(bd.getHashFromFilename(fn))
+            for h in bd.getHashFromFilename(fn):
+                hashesRemoved.add(h)
             operation(ACTION, fd[0],fd[1])
         return list(hashesRemoved)
     else:
         print('removing canceled')
         return []
 
-def purgeLogsbyHash(hlist,logs,flags=['None']):
+def purgeLogsbyHash(hlist,logs,deleteLogFile,flags=['None']):
     print(f'\nChecking  {hlist} in log files.')
     # now purge entries from the logs
     for lf in logs:
@@ -170,16 +185,17 @@ def purgeLogsbyHash(hlist,logs,flags=['None']):
             for h in hlist:
                 if h in line:
                     save = False
-            if save:
+            if save or ACTION == 'simulate':
                 keeplines.append(line)
             else:
                 deletelines.append(line)
+
         if 'listOnly' in flags:
             pass
             #print(f'\n    Matched {len(deletelines)} {hlist} entries from {justname}')
         else:
             # explain what you will do
-            print(f'\n    deleting {len(deletelines)}  entries from {justname}:')
+            print(f'\n    {ACTION}ing {len(deletelines)}  entries from {justname}:')
         f.close()
 
         i=0
@@ -190,14 +206,19 @@ def purgeLogsbyHash(hlist,logs,flags=['None']):
 
         # confirm y/N ??
         if 'listOnly' not in flags:
-            x = input(f'\n   OK to delete {len(deletelines)} entries from {justname}? (y/N): ')
+            x = input(f'\n   OK to {ACTION} {len(deletelines)} entries from {justname}? (y/N): ')
             if x.lower() == 'y':
                 # now modify the file
                 f = open(lf,'w')
                 for l in keeplines:
                     print(l.strip(),file=f)
                 f.close()
-                print(f' {len(deletelines)} lines purged from {justname}.')
+                if ACTION=='archive' or ACTION=='delete':  # move lines to the deleteLogFile
+                    f = open(deleteLogLogFile, 'a')
+                    for l in deletelines:
+                        print(l,file=f)
+                    f.close()
+                print(f' {len(deletelines)} lines {ACTION}ed from {justname}.')
             else:
                 print(' purging logs canceled.')
     if 'listOnly' in flags:
