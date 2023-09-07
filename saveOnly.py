@@ -8,34 +8,40 @@ import brl_data.brl_data as bd
 import datetime as dt
 import shutil as shu
 
+DEBUG = False
 ###ACTION = 'delete'   # actually delete old files
 ACTION = 'archive'  # save old files to trash
-trashcan = '/home/blake/Ptmp/CalTrajOpt/testing/Trash'
+
+if DEBUG:
+    trashcan = '/home/blake/Ptmp/CalTrajOpt/testing/Trash'
+else:
+    trashcan = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/Archive'
 
 def main(args):
 
     #  all the dirs we might find data files
-    #dirs = ['/home/blake/Sync/Research/CalTrajOpt_RESULTS',
-            #'/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data',
-            #'/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D-Round2',
-            #'/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data/Gold',
-            #'/home/blake/Sync/Research/CalTrajOpt_RESULTS/PointSetsRandom',
-            #'/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing'
-            #]
-
-
-    #wlog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/work_logbook.txt'
-    #ilog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/image_log.txt'
-    #logs = [wlog, ilog]
-
-    # for testing
-    dirs = ['/home/blake/Ptmp/CalTrajOpt/testing/folder1',
-            '/home/blake/Ptmp/CalTrajOpt/testing/folder2',
-            '/home/blake/Ptmp/CalTrajOpt/testing/folder3'
+    dirs = ['/home/blake/Sync/Research/CalTrajOpt_RESULTS',
+            '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data',
+            '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D-Round2',
+            '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data/Gold',
+            '/home/blake/Sync/Research/CalTrajOpt_RESULTS/PointSetsRandom',
+            '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing'
             ]
 
-    logs = ['/home/blake/Ptmp/CalTrajOpt/testing/log1.txt',
-            '/home/blake/Ptmp/CalTrajOpt/testing/log2.txt' ]
+
+    wlog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/work_logbook.txt'
+    ilog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/image_log.txt'
+    logs = [wlog, ilog]
+
+    #if DEBUG:
+        ## for testing
+        #dirs = ['/home/blake/Ptmp/CalTrajOpt/testing/folder1',
+                #'/home/blake/Ptmp/CalTrajOpt/testing/folder2',
+                #'/home/blake/Ptmp/CalTrajOpt/testing/folder3'
+                #]
+
+        #logs = ['/home/blake/Ptmp/CalTrajOpt/testing/log1.txt',
+                #'/home/blake/Ptmp/CalTrajOpt/testing/log2.txt' ]
 
     flags = ['nothing']
 
