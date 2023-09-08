@@ -13,26 +13,31 @@ DEBUG = False
 ACTION = 'archive'  # save old files to trash
 #ACTION = 'simulate'  # just simulate actions, don't do anything
 
+DEBUG = True
+RUNMODE = not DEBUG
 
 def main(args):
 
-    ##  all the dirs we might find data files
-    #dirs = ['/home/blake/Sync/Research/CalTrajOpt_RESULTS',
-            #'/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data',
-            #'/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D-Round2',
-            #'/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data/Gold',
-            #'/home/blake/Sync/Research/CalTrajOpt_RESULTS/PointSetsRandom',
-            #'/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing'
-            #]
+    if RUNMODE:  # real work on my files
+        #  all the dirs we might find data files
+        dirs = ['/home/blake/Sync/Research/CalTrajOpt_RESULTS',
+                '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data',
+                '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D-Round2',
+                '/home/blake/Sync/Research/CalTrajOpt_RESULTS/1D_data/Gold',
+                '/home/blake/Sync/Research/CalTrajOpt_RESULTS/PointSetsRandom',
+                '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing'
+                ]
 
-    #actionlogfile = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/deletions.txt'
+        actionlogfile = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/actionResults.txt'
+        failurelogfile = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/actionFailures.txt'
 
-    #wlog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/work_logbook.txt'
-    #ilog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/image_log.txt'
-    #logs = [wlog, ilog]
-    #trashcan = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/Archive'
+        wlog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/work_logbook.txt'
+        ilog = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/image_log.txt'
+        logs = [wlog, ilog]
 
-    if True:
+        trashcan = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/Archive'
+
+    if DEBUG:
         # for testing
         dirs = ['/home/blake/Ptmp/CalTrajOpt/testing/folder1',
                 '/home/blake/Ptmp/CalTrajOpt/testing/folder2',
@@ -42,12 +47,15 @@ def main(args):
         logs = ['/home/blake/Ptmp/CalTrajOpt/testing/log1.txt',
                 '/home/blake/Ptmp/CalTrajOpt/testing/log2.txt' ]
 
-        actionlogfile = '/home/blake/Ptmp/CalTrajOpt/testing/deletions.txt'
+        actionlogfile = '/home/blake/Ptmp/CalTrajOpt/testing/actionResults.txt'
+        failurelogfile = '/home/blake/Ptmp/CalTrajOpt/testing/actionFailures.txt'
         trashcan = '/home/blake/Ptmp/CalTrajOpt/testing/Trash'
 
+    # a compact way to pass these down the hierarchy
     locinfo = { 'dirs' : dirs,
                 'logs' : logs,
                 'actionlogfile' : actionlogfile,
+                'failurelogfile' : failurelogfile,
                 'trashcan' : trashcan }
 
     flags = ['nothing']
@@ -107,7 +115,7 @@ def main(args):
 
     hrem = processFilesbyHash(targetFileHashList,dirs,locinfo)
     #for h in hrem:
-        #log_record_deletions(h,ACTION,'file',locinfo)
+        #log_record_action_results(h,ACTION,'file',locinfo)
 
 
     # 3) find all log entries NOT having URIs2Save in them (hsetLogLines)
@@ -128,15 +136,25 @@ def main(args):
 
 def operation(ACTION, fdir, fname,locinfo):
     sourcefile = fdir+'/'+fname
+    success = True
     if ACTION == 'archive':
-        shu.move(sourcefile, locinfo['trashcan'] + '/' + fname)
+        try:
+            shu.move(sourcefile, locinfo['trashcan'] + '/' + fname)
+        except:
+            print(f'\n\n                   Somethings "wrong" with {sourcefile}, already moved\n\n')
+            success = False
     elif ACTION == 'delete':
-        os.remove(sourcefile)
+        try:
+            os.remove(sourcefile)
+        except:
+            print(f'\n\n                   Somethings "wrong" with {sourcefile}, already deleted\n\n')
+            success = False
     elif ACTION == 'simulate':
             pass
     else:
         print('unknown ACTION: ',ACTION)
         quit()
+    return success
 
 def processFilesbyHash(targets,dirs,locinfo, flags=['None']):
     hashesRemoved = set()
@@ -156,18 +174,27 @@ def processFilesbyHash(targets,dirs,locinfo, flags=['None']):
         return []
     x = input(f'\n\n          OK to {ACTION} these files?? ... (y/N)')
     if x.lower() == 'y':
-        for fd in fds:
-            fn = fd[1]
+        for fd in fds:  # fd[0] = dir fd[1] = name
             if ACTION == 'delete':
-                print(' ... removing ',fn)
+                print(' ... removing ',fd[1])
             elif ACTION == 'simulate':
-                print(' ... simulating ',fn)
+                print(' ... simulating ',fd[1])
             else:
-                print(f" ... archiving {fn} to {locinfo['trashcan']} ...")
-            for h in bd.getHashFromFilename(fn):
-                hashesRemoved.add(h)
-            operation(ACTION, fd[0],fd[1],locinfo)
-            log_record_deletions(h,ACTION,'file',locinfo['actionlogfile'])
+                print(f" ... archiving {fd[1]} to {locinfo['trashcan']} ...")
+            completed = False
+            for i,h in enumerate(bd.getHashFromFilename(fd[1])): # filename could have 2 hashes
+                if not completed: # you can only remove a file once!
+                    success = operation(ACTION, fd[0],fd[1],locinfo)
+                    if not success:  # we had an error from shutil!
+                        # record in failure log
+                        log_record_action_results(h,ACTION,'file',locinfo['failurelogfile'])
+                    else:
+                        # record in action log and note the hash
+                        log_record_action_results(h,ACTION,'file',locinfo['actionlogfile'])
+                        hashesRemoved.add(h)
+                else:
+                    pass # operation is already done for this file.
+                    hasesReemoved.add(h)  # the hash that was deleted in step one!
         return list(hashesRemoved)
     else:
         print('removing canceled')
@@ -219,7 +246,7 @@ def processLogsbyHash(hlist,logs,locinfo, flags=['None']):
                     for l in deletelines:
                         hs = bd.getHashFromFilename(l)  # maybe can be more than one?
                         for h in hs:
-                            log_record_deletions(h,ACTION,'log entry',locinfo['actionlogfile'])
+                            log_record_action_results(h,ACTION,'log entry',locinfo['actionlogfile'])
                 verb = f'{ACTION}ed'.replace('eed','ed')
                 print(f' {len(deletelines)} lines {verb} from {justname}.')
             else:
@@ -228,7 +255,7 @@ def processLogsbyHash(hlist,logs,locinfo, flags=['None']):
         print('\n\n             List only, no actions were taken.')
     return [] # we don't log hashes deleted from log files
 
-def log_record_deletions(hash, action, dtype, logfile):
+def log_record_action_results(hash, action, dtype, logfile):
     if action == 'simulate':
         print(f'   simulating recording a {dtype} deletion in {logfile}')
         return
