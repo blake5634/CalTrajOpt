@@ -95,17 +95,17 @@ def main(args):
                     fdList.append([d,f])
                     hset.add(thishash)
 
-    targetFileList = []
+    targetFileHashList = []
     n = 0
-    for hl in list( hset):
+    for hl in list(hset):
         n+=1
-        targetFileList.append(hl)  # these are 1-member lists: [ filename ]
+        targetFileHashList.append(hl)  # these are 1-member lists: [ filename ]
 
-    print(f'We have identified {len(targetFileList)} hashes to {ACTION}.')
+    print(f'We have identified {len(targetFileHashList)} hashes to {ACTION}.')
 
     # 2) purge those files
 
-    hrem = purgeFilesbyHash(targetFileList,dirs,locinfo)
+    hrem = processFilesbyHash(targetFileHashList,dirs,locinfo)
     #for h in hrem:
         #log_record_deletions(h,ACTION,'file',locinfo)
 
@@ -116,14 +116,14 @@ def main(args):
     for fn in logs:
         f = open(fn,'r')
         for line in f:
-            hashs = bd.getHashFromFilename(line) # None if line has no hash in it
+            hashs = bd.getHashFromFilename(line) # [] if line has no hash in it
             for thishash in hashs:
                 if thishash not in URIs2Save and thishash is not None:
                     hsetLogLines.add(thishash)
         f.close()
 
     # 4) purge the log entries
-    hrem = purgeLogsbyHash(list(hsetLogLines),logs, locinfo, flags=flags)
+    hrem = processLogsbyHash(list(hsetLogLines),logs, locinfo, flags=flags)
     quit()
 
 def operation(ACTION, fdir, fname,locinfo):
@@ -138,7 +138,7 @@ def operation(ACTION, fdir, fname,locinfo):
         print('unknown ACTION: ',ACTION)
         quit()
 
-def purgeFilesbyHash(targets,dirs,locinfo, flags=['None']):
+def processFilesbyHash(targets,dirs,locinfo, flags=['None']):
     hashesRemoved = set()
     myf = bd.finder()
     myf.set_dirs(dirs)
@@ -149,7 +149,7 @@ def purgeFilesbyHash(targets,dirs,locinfo, flags=['None']):
     print(f' I found {len(fds)} files matching the hash list:')
 
     i=0
-    for fd in fds:
+    for fd in fds:  # show the user all the files you will work on
         i+=1
         print(f'    {i}: [{fd[0]}/{fd[1]}]')
     if 'listOnly' in flags:
@@ -173,7 +173,7 @@ def purgeFilesbyHash(targets,dirs,locinfo, flags=['None']):
         print('removing canceled')
         return []
 
-def purgeLogsbyHash(hlist,logs,locinfo, flags=['None']):
+def processLogsbyHash(hlist,logs,locinfo, flags=['None']):
     print(f'\nChecking  {hlist} in log files.')
     # now purge entries from the logs
     for lf in logs:
@@ -196,7 +196,8 @@ def purgeLogsbyHash(hlist,logs,locinfo, flags=['None']):
             #print(f'\n    Matched {len(deletelines)} {hlist} entries from {justname}')
         else:
             # explain what you will do
-            print(f'\n    {ACTION}ing {len(deletelines)}  entries from {justname}:')
+            verb = f'{ACTION}ing'.replace('ein','in')
+            print(f'\n    {verb} {len(deletelines)}  entries from {justname}:')
         f.close()
 
         i=0
@@ -219,7 +220,8 @@ def purgeLogsbyHash(hlist,logs,locinfo, flags=['None']):
                         hs = bd.getHashFromFilename(l)  # maybe can be more than one?
                         for h in hs:
                             log_record_deletions(h,ACTION,'log entry',locinfo['actionlogfile'])
-                print(f' {len(deletelines)} lines {ACTION}ed from {justname}.')
+                verb = f'{ACTION}ed'.replace('eed','ed')
+                print(f' {len(deletelines)} lines {verb} from {justname}.')
             else:
                 print(' purging logs canceled.')
     if 'listOnly' in flags:
@@ -234,7 +236,8 @@ def log_record_deletions(hash, action, dtype, logfile):
         f = open(logfile, 'a')
         now = dt.datetime.now()
         dtstring = now.strftime('%Y-%m-%d %H:%M:%S')
-        logline = f'{dtstring}: {action}ed {dtype} for {hash}'
+        verb = f'{action}ed'.replace('ee','e')
+        logline = f'{dtstring}: {verb} {dtype} for {hash}'
         print(logline,file=f)
         f.close()
 
