@@ -12,7 +12,10 @@ logs = ['/home/blake/Ptmp/CalTrajOpt/testing/log1.txt',
 testfolders = ['folder1/','folder2/','folder3/']
 trash = '/home/blake/Ptmp/CalTrajOpt/testing/Trash'
 
-shutil.rmtree(tdir)
+try:
+   shutil.rmtree(tdir)
+except:
+   pass
 os.mkdir(tdir)
 for fld in testfolders:
    os.mkdir(tdir+fld)

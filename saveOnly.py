@@ -216,7 +216,9 @@ def purgeLogsbyHash(hlist,logs,locinfo, flags=['None']):
                         print(l.strip(),file=f)
                     f.close()
                     for l in deletelines:
-                        log_record_deletions(bd.getHashFromFilename(l),ACTION,'log entry',locinfo['actionlogfile'])
+                        hs = bd.getHashFromFilename(l)  # maybe can be more than one?
+                        for h in hs:
+                            log_record_deletions(h,ACTION,'log entry',locinfo['actionlogfile'])
                 print(f' {len(deletelines)} lines {ACTION}ed from {justname}.')
             else:
                 print(' purging logs canceled.')
