@@ -88,6 +88,7 @@ def main(args):
     #
     SPACE = '2D'
     #SPACE = '6D'
+    cto.AMAX = 0.2
 
     cto.N = 4
 
@@ -98,6 +99,13 @@ def main(args):
         Npts = N**6
     cto.M = Npts
     cto.Npts = Npts
+
+
+    # defaults: (no scaling)
+    cto.Scale2D = [[-1,1], [-1,1]]
+    cto.Scale6D = [[-1,1], [-1,1], [-1,1], [-1,1], [-1,1], [-1,1]]
+
+
     #
     #   Choose search type
     #
@@ -109,16 +117,19 @@ def main(args):
     #   Choose search size
     #
     #nsearch = int(np.math.factorial(Npts) * 0.10)  # 10% of 3x3
-    nsearch = int(1.0E06)  # 1M
+    #nsearch = int(1.0E06)  # 1M
     #nsearch = 50000  # mem limit for 4x4x6
     #nsearch = 2719  # 4x729 # 2D
     #nsearch = 10000  #10k  # 6D about 2 tries per 4096 start points
-    #nsearch = 10
+    nsearch = 1000
     #
     #   Choose cost type
     #
-    cto.costtype = 'time'
+    #cto.costtype = 'time'
     cto.costtype = 'energy'
+
+    PLOT = True
+
     cto.NPC = 30   #  # of simulation points in 0-dt time interval
     #
     ##########################################################################
@@ -177,7 +188,8 @@ def main(args):
                 dfr = bd.datafile('','','') #'' ok for reading
                 dfr.set_folders('','') # '' ok for reading
                 dfr.name = pointsFilename
-                pointSourceHash = points_grid.readPoints2D(dfr)  #read in the set of random points
+                #read in and scale the set of random points
+                pointSourceHash = points_grid.readPoints2D(dfr)
             c1.fill(points_grid) # calc trajectories and costs after points reading
             dfw = bd.datafile('2Dsearching','BH','simulation')
             dfw.set_folders(DataFolder,'')
@@ -214,7 +226,8 @@ def main(args):
             #  keep a "log book"
             logentry(dfw,notes)
             # graph the optimal search result (best path)
-            path2.plot(-1,notes)
+            if PLOT:
+                path2.plot(-1,notes)
 
     #
     #    6D version

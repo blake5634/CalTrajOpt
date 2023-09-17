@@ -35,6 +35,17 @@ costtype = 'energy'
 startrow = 3
 startcol = 1
 
+
+#
+#  Scale dims for each axis to match a real robot
+#  examples:
+#  [-1,1] means keep axis at the default normalized values
+#  [-30,25] means axis range should be -30-->25
+#
+# defaults: (no scaling)
+Scale2D = [[-1,1], [-1,1]]
+Scale6D = [[-1,1], [-1,1], [-1,1], [-1,1], [-1,1], [-1,1]]
+
 MAXTIEHISTO = 80  # how many bins for the tie frequency histogram
 
 def configure(fp=None):
@@ -167,14 +178,16 @@ class grid2D:
             error('readPoints2D: Do not read in points if they are not random')
         df.open('r')
         # read in pair of points for each Cm.m entry and store trajectory.
+        #  random points are U(-1,1).
         ptindex = 0
         for row in df.reader:
+
             i = int(row[0])  # 0 -- Npts-1
             j = int(row[1])
-            print(f"I'm creating point at {i}, {j}")
+
+            print(f"I'm creating and scaling random point at {i}, {j}")
             p1 = point2D(i,j)
-            p1.x = float(row[2])
-            p1.v = float(row[3])
+            p1.scale2D()
             self.gr[i][j]=p1
             ptindex += 1
         df.close()
@@ -255,10 +268,8 @@ def readPoints6D(df):  # read randomized points from a file
         xv = []
         for s in siv:   # convert from strings returned by reader
             iv.append(int(s))
-        for s in sxv:
-            xv.append(float(s))
         if ptindex != getidx6D(iv):
-            print(' ... somethings wrong line 235')
+            print(' ... somethings wrong line 297')
         p1 = point6D(iv)
         print(f"I'm creating 6D point at {iv}")
         p1.x = xv[0]  # transfer the random data to this pt.
@@ -268,6 +279,7 @@ def readPoints6D(df):  # read randomized points from a file
         p1.yd = xv[4]
         p1.zd = xv[5]
         p1.xvect = xv
+        p1.scale6D()  #apply scale transform
         pts.append(p1)
         ptindex += 1
     df.close()
@@ -394,6 +406,25 @@ class point6D:
         self.zd =  np.random.uniform(-1,1)
         self.xvect = [self.x,self.y,self.z,self.xd,self.yd,self.zd]
 
+
+    def scale6D(self):
+        vr = []
+        for i in range(6):
+            #generate Xform to scale [-1,1] to desired range
+            # y = a*(x+x0) + b
+            srange = Scale6D[i][1] - Scale6D[i][0]  # axis 1
+            a = srange/2
+            b = Scale6D[i][0]
+            vr.append(a*float(p.xvect[i]+1.0)+b
+        self.xvect = vr
+
+        self.x  = vr[0]
+        self.y  = vr[1]
+        self.z  = vr[2]
+        self.xd = vr[3]
+        self.yd = vr[4]
+        self.zd = vr[5]
+
     def __eq__(self, x):
         for i,sxv in enumerate(self.xvect):
             xxv = x.xvect[i]
@@ -425,6 +456,20 @@ class point2D:
     def randomize(self):
         self.x = np.random.uniform(-1,1)
         self.v = np.random.uniform(-1,1)
+        return
+
+    def scale2D(self):
+        vr = [self.x, self.v]
+        v = []
+        for i,val in enumerate(vr):
+            #generate Xform to scale [-1,1] to desired range
+            # y = a*(x+x0) + b
+            srange = Scale2D[i][1] - Scale6D[i][0]  # axis 1
+            a = srange/2
+            b = Scale6D[i][0]
+            v.append(a*float(val+1.0)+b
+        self.x  = v[0]
+        self.v  = v[1]
         return
 
     def __eq__(self,x):
