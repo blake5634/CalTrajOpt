@@ -149,6 +149,11 @@ class grid2D:
                 row.append(point2D(i,j))
             self.gr.append(row)
 
+    def scale2D(self):
+        for i in range(self.N):
+            for j in range(self.N):
+                self.gr[i][j].scale2D()
+
     #2D class grid2D
     def savePoints2D(self,df):   # save points generated into a file
         if not self.randgrid:
@@ -185,9 +190,8 @@ class grid2D:
             i = int(row[0])  # 0 -- Npts-1
             j = int(row[1])
 
-            print(f"I'm creating and scaling random point at {i}, {j}")
+            print(f"I'm creating random point at {i}, {j}")
             p1 = point2D(i,j)
-            p1.scale2D()
             self.gr[i][j]=p1
             ptindex += 1
         df.close()
@@ -279,7 +283,6 @@ def readPoints6D(df):  # read randomized points from a file
         p1.yd = xv[4]
         p1.zd = xv[5]
         p1.xvect = xv
-        p1.scale6D()  #apply scale transform
         pts.append(p1)
         ptindex += 1
     df.close()
@@ -415,7 +418,7 @@ class point6D:
             srange = Scale6D[i][1] - Scale6D[i][0]  # axis 1
             a = srange/2
             b = Scale6D[i][0]
-            vr.append(a*float(p.xvect[i]+1.0)+b
+            vr.append(a*float(p.xvect[i]+1.0)+b)
         self.xvect = vr
 
         self.x  = vr[0]
@@ -446,7 +449,7 @@ class point2D:
             error('point2D i,j is too big: '+str(i)+' '+str(j)+ ' /'+str(N))
         self.row = i
         self.col = j
-        self.x =     2*j/(N-1) - 1
+        self.x =     2*j/(N-1) - 1   # these subject to change with .scale2D()
         self.v = -1*(2*i/(N-1) - 1)
         if self.x < -1.05 or self.x > 1.05:
             msg = f"point2D: I'm creating bogus point coordinates: {i} {j} {self.x} {self.v}"
@@ -464,10 +467,9 @@ class point2D:
         for i,val in enumerate(vr):
             #generate Xform to scale [-1,1] to desired range
             # y = a*(x+x0) + b
-            srange = Scale2D[i][1] - Scale6D[i][0]  # axis 1
-            a = srange/2
-            b = Scale6D[i][0]
-            v.append(a*float(val+1.0)+b
+            a = (Scale2D[i][1] - Scale2D[i][0])/2.0
+            b = Scale2D[i][0]
+            v.append(a*float(val+1.0)+b)
         self.x  = v[0]
         self.v  = v[1]
         return
@@ -1542,9 +1544,6 @@ class path2D:
         arrow_positions = arrow_positions[:-1:arrow_interval]
         arrow_directions = arrow_directions[::arrow_interval]
 
-        tr = self.path[0]
-        startpt = plt.Circle((tr.p1.x,tr.p1.v),0.05,color='green')
-        ax.add_patch(startpt)
 
         plt.quiver(
             arrow_positions[:, 0],
@@ -1561,9 +1560,19 @@ class path2D:
         # get curves for each arc
         cx, cy = self.compute_curves(-1) #compute trajectory path
         ax.plot(cx,cy,color='blue')
+
+        # plot the start point as larger dot
+        tr = self.path[0]
+        #x = [tr.p1.x]
+        #y = [tr.p1.v]
+        #r = [20]
+        startpt = plt.Circle((tr.p1.x,tr.p1.v),0.5,color='green')
+        #ax.scatter(x,y,s=r,alpha=0.3)
+        ax.add_patch(startpt)
+
         axlim = 2
-        ax.set_xlim([-axlim,axlim])
-        ax.set_ylim([-axlim,axlim])
+        #ax.set_xlim([-axlim,axlim])
+        #ax.set_ylim([-axlim,axlim])
 
     def plotDone(self,figure):
         plt.show()

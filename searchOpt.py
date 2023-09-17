@@ -88,7 +88,7 @@ def main(args):
     #
     SPACE = '2D'
     #SPACE = '6D'
-    cto.AMAX = 0.2
+    cto.AMAX = 2
 
     cto.N = 4
 
@@ -100,11 +100,19 @@ def main(args):
     cto.M = Npts
     cto.Npts = Npts
 
+    # Haonan's experimental Ranges
+    # Jt       pos           Vel           |Acc|
+    #  1       15-70 deg    -4 4             2
+    #  2       50-115deg    -4 4             2
+    #  3      320-430mm     -4 4             4mm/s
 
     # defaults: (no scaling)
-    cto.Scale2D = [[-1,1], [-1,1]]
-    cto.Scale6D = [[-1,1], [-1,1], [-1,1], [-1,1], [-1,1], [-1,1]]
+    #    reduce ranges to account for overshoot in phase plots(!)
+    # jt 1  cto.Scale2D = [[20, 65], [-3,3]]
+    # jt 1
+    cto.Scale2D = [[55, 110], [-2,2]]
 
+    cto.Scale6D = [[-1,1], [-1,1], [-1,1], [-1,1], [-1,1], [-1,1]]
 
     #
     #   Choose search type
@@ -125,8 +133,8 @@ def main(args):
     #
     #   Choose cost type
     #
-    #cto.costtype = 'time'
-    cto.costtype = 'energy'
+    cto.costtype = 'time'
+    #cto.costtype = 'energy'
 
     PLOT = True
 
@@ -176,6 +184,7 @@ def main(args):
             df.metadata.d['Computer Name'] = cto.PCNAME
             df.metadata.d['N'] = N
             df.metadata.d['Space'] = SPACE
+            # always save the points grid UNscaled
             points_grid.savePoints2D(df) #this will set the 'Research Question' to "RandomGridPointSet"
             print(f'Random pts saved to {df.name}')
             notes = f'generated random points file: {df.hashcode} {cto.N}x{cto.N}'
@@ -190,6 +199,7 @@ def main(args):
                 dfr.name = pointsFilename
                 #read in and scale the set of random points
                 pointSourceHash = points_grid.readPoints2D(dfr)
+            points_grid.scale2D()  # apply the scale transform to end use coordinates
             c1.fill(points_grid) # calc trajectories and costs after points reading
             dfw = bd.datafile('2Dsearching','BH','simulation')
             dfw.set_folders(DataFolder,'')
@@ -204,6 +214,7 @@ def main(args):
                 dfw.metadata.d['Random Grid'] = True
             else:
                 dfw.metadata.d['Random Grid'] = False
+            dfw.metadata.d['Scale'] = cto.Scale2D
             q = input('Research Question for this 2D search: ')
             dfw.metadata.d['Research Question'] = q
             print(f"RQ0: {dfw.metadata.d['Research Question']}")
@@ -267,13 +278,17 @@ def main(args):
                 dfr.set_folders('','') # '' ok for reading
                 dfr.name = pointsFilename
                 pointSourceHash = cto.readPoints6D(dfr)  #read in the set of random points
-            # not for 6D: c1.fill(points_grid) # calc  costs after points reading
+
+            # apply the scale Xform to each point giving end-user coordinates
+            for p in cto.pts:
+                p.scale6D()
             dfw = bd.datafile('6Dsearching','BH','simulation')
             dfw.metadata.d['Computer Name'] = cto.PCNAME
             if gridtype == 'random':
                 dfw.metadata.d['Random Grid'] = True
             else:
                 dfw.metadata.d['Random Grid'] = False
+            dfw.metadata.d['Scale'] = cto.Scale6D
             dfw.metadata.d['Computer Name'] = cto.PCNAME
             dfw.metadata.d['N'] = N
             dfw.metadata.d['Space'] = SPACE
