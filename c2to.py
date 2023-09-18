@@ -231,7 +231,7 @@ def setupPoints6D():
     print(f'setupPoints6D generated {len(pts)} points')
     return pts
 
-def savePoints6D(df):   # save points generated into a file
+def savePoints6D(df):   # save points generated (esp random) into a file
     # each entry in Cm is a trajectory2D  we need only store p1 and p2
     it =str(type(5))
     ft =str(type(3.14159))
@@ -418,7 +418,7 @@ class point6D:
             srange = Scale6D[i][1] - Scale6D[i][0]  # axis 1
             a = srange/2
             b = Scale6D[i][0]
-            vr.append(a*float(p.xvect[i]+1.0)+b)
+            vr.append(a*float(self.xvect[i]+1.0)+b)
         self.xvect = vr
 
         self.x  = vr[0]
@@ -2106,16 +2106,16 @@ class path6D:
         return x
 
     #6D
-    def save6D(self,fname): # save 6D trajectory for animation and plotting
+    def save6D(self,hashcode): # save 6D trajectory for animation and plotting
         #
         #   this is a new datafile just for visualization
         #
-        df = bd.datafile(fname, 'BH', 'simulation')
-        df.set_folders('','') # default local foldesr
-        df = self.datafile
-        x = self.compute_curves(-1) # save all trajectories
+        df = bd.datafile('6Dtrajdata', 'BH', 'simulation')
+        df.hashcode = hashcode # keep hashcode same as search df.
+        df.set_folders('','') # default local folders
+        trajcurves = self.compute_curves6D(-1) # save all trajectories
         print('path.save: x points:     ',len(self.path))
-        print('path.save: x curves dims:', x.shape)
+        print('path.save: x curves dims:', trajcurves.shape)
         col_names = ['n','X','Y','Z']
         int_type = str(type(5))    # these have to be strings b/c json can't serialize types(!)
         float_type = str(type(3.14159))
@@ -2135,9 +2135,9 @@ class path6D:
         df.open()  # let's open the file (default is for writing)
 
         ##  Now lets write out data
-        r,c = np.shape(x)
+        r,c = np.shape(trajcurves)
         for i in range(c):
-            row = [i,x[0][i],x[1][i],x[2][i]]
+            row = [i,tracurves[0][i],tracurves[1][i],tracurves[2][i]]
             df.write(row)
 
         df.close()   # all done

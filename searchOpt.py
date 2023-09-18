@@ -80,14 +80,17 @@ def main(args):
 
 
 
+
+
+    ##########################################################################
     ##########################################################################
     ##########################################################################
     #
     #    Configure the job
     #        (gridtype is set by command line args (see above))
     #
-    SPACE = '2D'
-    #SPACE = '6D'
+    #SPACE = '2D'
+    SPACE = '6D'
     cto.AMAX = 2
 
     cto.N = 4
@@ -129,7 +132,7 @@ def main(args):
     #nsearch = 50000  # mem limit for 4x4x6
     #nsearch = 2719  # 4x729 # 2D
     #nsearch = 10000  #10k  # 6D about 2 tries per 4096 start points
-    nsearch = 1000
+    nsearch = 100
     #
     #   Choose cost type
     #
@@ -142,6 +145,8 @@ def main(args):
     #
     ##########################################################################
     ##########################################################################
+    ##########################################################################
+
 
 
 
@@ -282,6 +287,7 @@ def main(args):
             # apply the scale Xform to each point giving end-user coordinates
             for p in cto.pts:
                 p.scale6D()
+
             dfw = bd.datafile('6Dsearching','BH','simulation')
             dfw.metadata.d['Computer Name'] = cto.PCNAME
             if gridtype == 'random':
@@ -315,10 +321,11 @@ def main(args):
                 notes = f"Search Result: 6D {gridtype} grid, {SEARCHT}, cost: {cmin:.1f} ({cto.costtype})"
                 print(f'\n\n               your search results file hash is: {dfw.hashcode}.')
             print(f"RQ2: {dfw.metadata.d['Research Question']}")
+            if PLOT:
+                # save the best path for plotting and animation
+                path2.save6D(dfw.hashcode)
             #  keep a "log book"
             logentry(dfw,notes)
-            # graph the optimal search result (best path)
-            #path2.plot(-1,notes)  # tougher for 6D
 
 def logentry(df,notes):
     logdir = '/home/blake/Sync/Research/CalTrajOpt_RESULTS/writing/'
