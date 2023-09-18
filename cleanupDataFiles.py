@@ -120,7 +120,8 @@ def cleanOutDatafiles(dirs):  # based on metadata
             if x.lower() == 'y':
                 for fn in remlist:
                     # keep around a set of the hashes removed
-                    hashesRemoved.add(bd.getHashFromFilename(fn))
+                    for fhash in bd.getHashFromFilename(fn):
+                        hashesRemoved.add(fhash)
                     print(' ... removing ',fn)
                     os.remove(fn)
             else:
