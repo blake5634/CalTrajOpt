@@ -2106,7 +2106,8 @@ class path6D:
                     error('discontinuous path: '+str(i-1)+' '+str(i))
             i+=1
     #6D
-    def compute_curves6D(self): #6D
+    def compute_curves6D(self,pdt): #6D
+        # pdt = float: dt used for traj plotting
         curvepts_x = []
         for i,tr in enumerate(self.path):
             if not tr.valid:
@@ -2115,12 +2116,14 @@ class path6D:
                 error('null traj: '+ str(i) + str(tr))
             if not tr.computed and not tr.constrained:
                 error('Cant plot until trajectory is computed and constrained '+ str(i) + str(tr))
-            dt = tr.dt
-            for i in range(NPC):
-                t = dt*i/NPC
+            t = 0.0
+            while(1):
                 curvepts_x.append(tr.x(t))
-            curvepts_x.append(tr.x(dt))
-        x = np.array(curvepts_x).T
+                t += pdt  #increment time by standard amt
+                if t > tr.dt:
+                    break
+            curvepts_x.append(tr.x(dt)) #end the curve
+            x = np.array(curvepts_x).T
         return x
 
     #6D
@@ -2131,14 +2134,16 @@ class path6D:
         df = bd.datafile('6Dtrajdata', 'BH', 'simulation')
         df.hashcode = hashcode # keep hashcode same as search df.
         df.set_folders('','') # default local folders
-        trajcurves = self.compute_curves6D() # save all trajectories
+        pdt = 0.5  # dt for traj plotting
+        df.metadata.d['plotting DT']=pdt
+        trajcurves = self.compute_curves6D(pdt) # save all trajectories
         print('path.save: x points:     ',len(self.path))
         print('path.save: x curves dims:', trajcurves.shape)
-        col_names = ['n','X','Y','Z']
+        col_names = ['t','X','Y','Z']
         int_type = str(type(5))    # these have to be strings b/c json can't serialize types(!)
         float_type = str(type(3.14159))
         col_types = [ int_type, float_type, float_type, float_type]
-        col_comments = ['','','','']
+        col_comments = ['sec','deg','deg','mm']
         df.set_metadata(col_names, col_types, col_comments)
         df.metadata.d['AMAX']=AMAX
         df.metadata.d['N'] = N
@@ -2155,7 +2160,7 @@ class path6D:
         ##  Now lets write out data
         r,c = np.shape(trajcurves)
         for i in range(c):
-            row = [i,trajcurves[0][i],trajcurves[1][i],trajcurves[2][i]]
+            row = [ i*pdt ,trajcurves[0][i],trajcurves[1][i],trajcurves[2][i] ]
             df.write(row)
         print(f' ... a full 6D trajectory was saved to {df.name}')
         df.close()   # all done
