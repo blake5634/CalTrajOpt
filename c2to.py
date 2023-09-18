@@ -726,7 +726,7 @@ class trajectory6D:
         return dt
 
     #6D
-    def timeEvolution(self,ACC_ONLY = False):  #6D & 6D
+    def timeEvolution(self,ACC_ONLY = False):  #6D
         if not self.computed and not self.constrained:
             error('Cant compute 6D timeEvolution until trajectory is computed and constrained')
         Np = 20-1
@@ -1153,6 +1153,8 @@ class path2D:
         for p in piter:  # piter returns a whole "list" of point indices each time
             itrct += 1
             idxpath = list(p)
+            if len(idxpath) != Npts:
+                error(f' path length is wrong: {len(idxpath)} vs. {Npts}')
             p = path2D(self.grid, self.Cm) # temp variable
             p.idxpath = idxpath # use own idxpath for tmp idx path storage(!)
             p.path = []  # use own path for tmp path storage(!)
@@ -1825,7 +1827,9 @@ class path6D:
                 n+=1 # count adds (faster than len()??)
         #sizer('piter: ',piter)
         print('Path enumeration complete (without duplicates):')
-
+        for p in piter:
+            if len(p) != Npts:
+                error(f'generated wrong length paths: {len(p)} vs. Npts')
         #2) evaluate their costs
 
         self.Cm = Cm6D()   # this will store costs for each Tr  as they are encountered
@@ -1841,12 +1845,15 @@ class path6D:
             # p is the current path [idx0,idx1,idx2 ...]
             # now get the cost of p
             idxpath = list(p)
+            L = len(idxpath)
+            if L != Npts:
+                error(f'"iterator" produces incorrect path length: {L} vs. {Npts}')
             c = cost_idxp6D(costtype, idxpath,self.Cm)  #what is cost of this path?
             if n%updaterate == 0:
                 pct = 100.0*n/nsamples
                 print(f'seach completion: {pct:4}%') # I'm alive!
             if STOREDATA:
-                row = idxpath # list of int index pts
+                row = idxpath.copy() # list of int index pts
                 row.append(c) # tack on the cost
                 df.write(row)
             if c > cmax:
@@ -1881,6 +1888,20 @@ class path6D:
             df.metadata.d['Max Cost']=cmax
             df.close()
         pmin.datafile = self.datafile
+        #
+        #  for only the min cost path, complete the trajectories list self.path
+        print(f'len(pmin.idxpath) = {len(pmin.idxpath)}')
+        L = len(pmin.idxpath)-1  # 1 less trajectories than points
+        if L != Npts-1:
+            error(f'bruteforcesearch: not a correct length path!: {L} vs. {Npts-1}')
+        for i in range(L):
+            i1 = pmin.idxpath[i]
+            i2 = pmin.idxpath[i+1]
+            if i1==i2:
+                error('path repeats a node index')
+            tr = trajectory6D(pts[i1],pts[i2])
+            tr.constrain_A() # compute and constrain the tr
+            pmin.path.append(tr)
         #return path object, float
         return pmin, pmin.Tcost     # end of bruteforce
 
@@ -2085,23 +2106,20 @@ class path6D:
                     error('discontinuous path: '+str(i-1)+' '+str(i))
             i+=1
     #6D
-    def compute_curves6D(self,idx): #6D
+    def compute_curves6D(self): #6D
         curvepts_x = []
         for i,tr in enumerate(self.path):
-            if i in idx:
-                if i == len(self.path):
-                    break
-                if not tr.valid:
-                    error('compute_curves()6D: I should not have found an invalid trajectory in path: '+str(i))
-                if tr is None:
-                    error('null traj: '+ str(i) + str(tr))
-                if not tr.computed and not tr.constrained:
-                    error('Cant plot until trajectory is computed and constrained '+ str(i) + str(tr))
-                dt = tr.dt
-                for i in range(NPC):
-                    t = dt*i/NPC
-                    curvepts_x.append(tr.x(t))
-                curvepts_x.append(tr.x(dt))
+            if not tr.valid:
+                error('compute_curves()6D: I should not have found an invalid trajectory in path: '+str(i))
+            if tr is None:
+                error('null traj: '+ str(i) + str(tr))
+            if not tr.computed and not tr.constrained:
+                error('Cant plot until trajectory is computed and constrained '+ str(i) + str(tr))
+            dt = tr.dt
+            for i in range(NPC):
+                t = dt*i/NPC
+                curvepts_x.append(tr.x(t))
+            curvepts_x.append(tr.x(dt))
         x = np.array(curvepts_x).T
         return x
 
@@ -2113,7 +2131,7 @@ class path6D:
         df = bd.datafile('6Dtrajdata', 'BH', 'simulation')
         df.hashcode = hashcode # keep hashcode same as search df.
         df.set_folders('','') # default local folders
-        trajcurves = self.compute_curves6D(-1) # save all trajectories
+        trajcurves = self.compute_curves6D() # save all trajectories
         print('path.save: x points:     ',len(self.path))
         print('path.save: x curves dims:', trajcurves.shape)
         col_names = ['n','X','Y','Z']
@@ -2137,9 +2155,9 @@ class path6D:
         ##  Now lets write out data
         r,c = np.shape(trajcurves)
         for i in range(c):
-            row = [i,tracurves[0][i],tracurves[1][i],tracurves[2][i]]
+            row = [i,trajcurves[0][i],trajcurves[1][i],trajcurves[2][i]]
             df.write(row)
-
+        print(f' ... a full 6D trajectory was saved to {df.name}')
         df.close()   # all done
 
 
