@@ -2122,7 +2122,7 @@ class path6D:
                 t += pdt  #increment time by standard amt
                 if t > tr.dt:
                     break
-            curvepts_x.append(tr.x(dt)) #end the curve
+            curvepts_x.append(tr.x(tr.dt)) #end the curve
             x = np.array(curvepts_x).T
         return x
 

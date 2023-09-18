@@ -115,7 +115,7 @@ def main(args):
     # jt 1
     cto.Scale2D = [[55, 110], [-2,2]]
 
-    cto.Scale6D = [[-1,1], [-1,1], [-1,1], [-1,1], [-1,1], [-1,1]]
+    cto.Scale6D = [[15,70], [50, 115], [320, 430], [-4,4], [-4,4], [-4,4]]
 
     #
     #   Choose search type
@@ -285,8 +285,9 @@ def main(args):
                 pointSourceHash = cto.readPoints6D(dfr)  #read in the set of random points
 
             # apply the scale Xform to each point giving end-user coordinates
-            for p in cto.pts:
-                p.scale6D()
+            if cto.Scale6D !=  [[-1,1], [-1,1], [-1,1], [-1,1], [-1,1], [-1,1]]:
+                for p in cto.pts:
+                    p.scale6D()
 
             dfw = bd.datafile('6Dsearching','BH','simulation')
             dfw.metadata.d['Computer Name'] = cto.PCNAME
