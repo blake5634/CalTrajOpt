@@ -117,6 +117,8 @@ def main(args):
 
     cto.Scale6D = [[15,70], [50, 115], [320, 430], [-4,4], [-4,4], [-4,4]]
 
+    cto.alimits = [2,2,4]  #|Acc| limits for each mechanism axis
+
     #
     #   Choose search type
     #
@@ -323,6 +325,7 @@ def main(args):
                 print(f'\n\n               your search results file hash is: {dfw.hashcode}.')
             print(f"RQ2: {dfw.metadata.d['Research Question']}")
             if PLOT:
+                print(' Saving 6D trajectory data for animation.plotting')
                 # save the best path for plotting and animation
                 path2.save6D(dfw.hashcode)
             #  keep a "log book"

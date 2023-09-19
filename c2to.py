@@ -46,6 +46,8 @@ startcol = 1
 Scale2D = [[-1,1], [-1,1]]
 Scale6D = [[-1,1], [-1,1], [-1,1], [-1,1], [-1,1], [-1,1]]
 
+alimits = [AMAX,AMAX,AMAX]  #|Acc| limits for each mechanism axis
+
 MAXTIEHISTO = 80  # how many bins for the tie frequency histogram
 
 def configure(fp=None):
@@ -529,9 +531,11 @@ class trajectory2D:
     def xdd(self,t):
         return                       2.0*self.a2    + 6.0*self.a3*t
 
+    #2D
     def get_Amax(self,dt):
         return max(abs(self.xdd(0)),abs(self.xdd(dt)))
 
+    #2D
     def constrain_A(self):
         # hack for fixed dt
         #dt = DT_TEST
@@ -564,6 +568,7 @@ class trajectory2D:
         self.compute(self.dt) # because we changed dt
         return dt
 
+    #2D
     def timeEvolution(self,ACC_ONLY=False):
         if not self.computed and not self.constrained:
             error('Cant compute timeEvolution until trajectory is computed and constrained')
@@ -673,25 +678,30 @@ class trajectory6D:
         return rv
 
     #6D
-    def get_Amax(self,dt):
+    #
+    #  Each axis will be normalized to its own AMAX so that return val is 0-1
+    #        (this allows different AMAX for each axis per physical robots)
+    #    alims = [amax_0, amax_1, amax_2]
+    def get_Amax6D(self,dt,alims):
         if not self.computed:
             error('cant get_Amax() unless tr.computed is True')
-        amax = -1000
+        amax = -9999   #
         acc1 = self.xdd(0)
         acc2 = self.xdd(dt)
         for i in range(3):
-            t = abs(acc1[i])
+            t = abs(acc1[i])/alims[i] # normalize to 0-1 range
             if t > amax:
                 amax = t
-            t = abs(acc2[i])
+            t = abs(acc2[i])/alims[i] # normalize to 0-1 range
             if t > amax:
                 amax = t
         return amax
 
 
     #
-    # it seems constrain_A can be identical for 6D and 1D(!)
+    # it seems constrain_A can be identical for 6D and 1D(?)
     #
+    #6D
     def constrain_A(self):
         # hack for fixed dt
         #dt = DT_TEST
@@ -705,7 +715,7 @@ class trajectory6D:
         while True:
             ni += 1
             self.compute(dt)
-            if self.get_Amax(dt) > AMAX:
+            if self.get_Amax6D(dt, alimits) > 1.0:
                 dt *= 1.10  # if amax too big, slow down
             else:
                 break
@@ -713,13 +723,13 @@ class trajectory6D:
         while True:
             ni += 1
             self.compute(dt)
-            if self.get_Amax(dt) > AMAX:
+            if self.get_Amax6D(dt,alimits) > 1.0:
                 dt *= 1.04
             else:
                 break
-        am = self.get_Amax(dt)
-        #print('Constrain_A: iterations: ', ni, ' dt = {:6.3f} Amax: {:4.2f}'.format(dt,am), ' AMAX:',AMAX)
-        #print('             Amax accuracy: {:6.3f}'.format(abs(AMAX - am)))
+        #am = self.get_Amax6D(dt, alimits)
+        #print('Constrain_A: iterations: ', ni, ' dt = {:6.3f} Amax: {:4.2f}'.format(dt,am), ' AMAX:',1.0)
+        #print('             Amax accuracy: {:6.3f}%'.format(100*(1.0-abs(AMAX - am))))
         self.dt = dt
         self.constrained = True
         self.compute(self.dt) # because we changed dt
@@ -2164,142 +2174,4 @@ class path6D:
             df.write(row)
         print(f' ... a full 6D trajectory was saved to {df.name}')
         df.close()   # all done
-
-
-def main():
-    import pickle
-    import os
-
-    epsilon = 0.02
-
-    configure()
-
-    print('Commencing tests: 6D, N=',N)
-
-    print('index <--> coordinates test')
-
-    v=[0,0,0,0,0]  # 5 random 6D test coordinate vectors
-
-    for i in range(len(v)):
-        v[i] = [0]*6
-        for j in range(6):
-            v[i][j] = random.choice(range(N))
-        print('v: [',i,']:',v[i])
-
-    for i in range(3):
-            x = getcoord6D(getidx6D(v[i]))
-            assert x==v[i]
-
-    print('index <--> coordinates test: PASSED')
-
-    # get curves for each arc
-    cx, cy = self.compute_curves(-1) #compute trajectory path
-    ax.plot(cx,cy,color='blue')
-    axlim = 2
-    ax.set_xlim([-axlim,axlim])
-    ax.set_ylim([-axlim,axlim])
-
-    print('\n\n   Cm tests: ')
-
-    c1 = Cm2D()
-
-    SKIPFILL = False  # save time to focus on later tests
-
-    if not SKIPFILL:
-        pname = 'c1Costs.pickle'
-        if os.path.exists(pname):
-            print('loading precomputed cost matrix   ...')
-            f = open(pname, 'rb')
-            c1 = pickle.load(f)
-            print(' loading completed')
-        else:
-            print('no stored data: computing cost matrix')
-            c1.fill()
-            f = open(pname,'wb')
-            pickle.dump(c1,f)
-
-    r,c = np.shape(c1.m)
-
-    assert r==c
-    assert r == Npts
-
-    p1 = point6D(getcoord6D(1234))
-    p2 = point6D(getcoord6D(3241))
-    tr12 = trajectory6D(p1,p2)
-    tt3d = type(tr12)
-
-    if not SKIPFILL:
-        # [10][10] is just a "random" traj
-        assert type(c1.m[10][10]) == tt3d
-        assert not c1.m[10][10].valid  # self-self transitions invalid.
-        assert c1.m[10][11].valid
-    else:
-        print('\n                 fill test skipped!!\n')
-        c1.m[10][10] = tr12
-
-    # try a path:
-    p = path2D(gt,c1,r,c)
-    p.heuristicSearch()
-
-    print(p)
-    print('   Cm tests:  PASSED')
-
-    print('\n\n   Amax tests')
-    print('\n\n If this test fails, try a smaller value of DT_START (in ctoConfig.txt)\n')
-
-    print('DT_START: ',DT_START)
-    print('AMAX: ',AMAX)
-    for i in range(10):
-        p1 = point6D(getcoord6D(random.randint(0,Npts-1)))
-        p2 = point6D(getcoord6D(random.randint(0,Npts-1)))
-        tr12.p1 = p1
-        tr12.p2 = p2
-        tr12.constrain_A()
-        print('Amax test: tr12:',tr12)
-        a = tr12.timeEvolution(ACC_ONLY=True)
-        amax_min = 9999999999
-        for i in range(3):
-            #print('amax[i]: ',max(a[i]), min(a[i]))
-            # is acceleration properly constrained?
-            mx = max(abs(max(a[i])), abs(min(a[i])))
-            amax_diff = abs(mx-AMAX)/AMAX
-            if amax_diff < amax_min:
-                amax_min = amax_diff
-        print('             amax_min: ',amax_min) # how close peak acc is to AMAX
-        # test that amax is close to AMAX
-        assert amax_min < epsilon
-
-    print('\n\n   Amax tests:   PASSED')
-
-
-    print('\n\n    Cost tests')
-    tr12.getCosts()
-    #a = tr12.timeEvolution(ACC_ONLY=True)
-    #tr12.cost_e(a)
-    #tr12.cost_t(a)
-    assert tr12.e_cost > 0
-    assert tr12.t_cost > 0
-
-
-    print('cost tests:     PASSED')
-
-    #
-    #  set up a df for search tests
-    #
-    df = bd.datafile('tests','BH','simulation')
-    df.set_folders('/home/blake/Sync/Research/CalTrajOpt_RESULTS','')
-    df.metadata.d['ResearchQuestion'] = 'debug and test'
-
-
-    print('\n\nsearch test 1:   sampling random paths')
-    searchtype = 'sampling search'
-    bpath = path6D()
-    bpath.search(searchtype,dfile=df,nsamples=10000)
-
-
-    print('\n\n            ALL tests:     PASSED')
-
-if __name__ ==  '__main__':
-    print('main starting:')
-    main()
 

@@ -23,11 +23,11 @@ y = []
 z = []
 for row in df.reader:
     #print (row)
-    i = int(row[0])
+    t.append(float(row[0]))
     x.append(float(row[1]))
     y.append(float(row[2]))
     z.append(float(row[3]))
-    t.append(i*dt)
+    #t.append(i*dt)
 print('')
 print('Read in {:} points with brl_data'.format(len(x)))
 print('Cost: {:}, Amax: {:}'.format(df.metadata.d['costtype'],df.metadata.d['AMAX']))
@@ -46,6 +46,8 @@ def func(num, dataSet, line):
 
 dataSet = np.array([x, y, z])
 numDataPoints = len(z)
+
+ANIM_DELAY = 500
 
 # GET SOME MATPLOTLIB OBJECTS
 #fig = plt.figure()
@@ -69,7 +71,7 @@ ax.set_title('Scaled Units 3D traj for Raven')
 line = plt.plot(dataSet[0], dataSet[1], dataSet[2], lw=2, c='g')[0] # For line plot
 
 # Creating the Animation object
-line_ani = animation.FuncAnimation(fig, func, frames=numDataPoints, fargs=(dataSet,line), interval=25, blit=False)
+line_ani = animation.FuncAnimation(fig, func, frames=numDataPoints, fargs=(dataSet,line), interval=ANIM_DELAY, blit=False)
 #line_ani.save(r'AnimationNew.mp4')
 
 
